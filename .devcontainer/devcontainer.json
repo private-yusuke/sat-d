@@ -1,0 +1,12 @@
+{
+    "image": "dlang2/dmd-ubuntu",
+    "runArgs": ["--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined"],
+    "postCreateCommand": "apt-get update && apt-get install -y --no-install-recommends gdb git",
+    "extensions": ["webfreak.code-d", "webfreak.debug"],
+    "settings": {
+        "d.dmdPath": "ldmd2",
+        "d.stdlibPath": [
+            "/dlang/dc/import"
+        ]
+    }
+}

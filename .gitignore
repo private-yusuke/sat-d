@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/sat-d
+sat-d.so
+sat-d.dylib
+sat-d.dll
+sat-d.a
+sat-d.lib
+sat-d-test-*
+*.exe
+*.o
+*.obj
+*.lst

@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"public_yusuke"
+	],
+	"copyright": "Copyright © 2020, public_yusuke",
+	"description": "A small SAT solver implementation",
+	"license": "MIT",
+	"name": "sat-d"
+}
