@@ -3,4 +3,11 @@ language: d
 d:
   - dmd
 
+before_install:
+  - sudo apt-get -y install minisat
+
+addons:
+  apt:
+    update: true
+
 script: make test
