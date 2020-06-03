@@ -1,9 +1,10 @@
 module cnf;
 import std.container : redBlackTree, RedBlackTree;
 import std.array : array;
-import std.algorithm : count;
+import std.algorithm : count, sort;
 import std.string : format;
-import std.range : empty;
+import std.range : empty, zip;
+import std.math : abs;
 import dimacs;
 
 debug import std.stdio;
@@ -31,6 +32,13 @@ struct Literal
         return this;
     }
 
+    Literal positive()
+    {
+        this.isNegated = false;
+        this.id = abs(this.id);
+        return this;
+    }
+
     string toString() const
     {
         if (this.isNegated)
@@ -49,6 +57,12 @@ struct Clause
     {
         this.id = id;
         this.literals = redBlackTree(literals);
+    }
+
+    this(Clause rhs)
+    {
+        this.literals = rhs.literals.dup;
+        this.id = id;
     }
 
     bool isEmpty()
@@ -73,7 +87,9 @@ struct Clause
 
     string toString() const
     {
-        return format("%(%s∧%)", literals.array);
+        if (literals.array.empty)
+            return "<empty>";
+        return format("%(%s∨%)", literals.array);
     }
 }
 
@@ -115,6 +131,33 @@ struct CNF
         }
     }
 
+    // for deep copy...
+    // TODO: Is there simpler implementation than this?
+    this(CNF rhs)
+    {
+        this.variableNum = rhs.variableNum;
+        this.clauseNum = rhs.clauseNum;
+
+        foreach (key, value; rhs.allClauses)
+        {
+            this.allClauses[key] = Clause(value);
+        }
+        foreach (key, value; rhs.normalClauses)
+        {
+            this.normalClauses[key] = Clause(value);
+        }
+        foreach (key, value; rhs.unitClauses)
+        {
+            this.unitClauses[key] = Clause(value);
+        }
+        foreach (key, value; rhs.emptyClauses)
+        {
+            this.emptyClauses[key] = Clause(value);
+        }
+        this.literalsInClause = rhs.literalsInClause.dup;
+        this.clausesContainingLiteral = rhs.clausesContainingLiteral.dup;
+    }
+
     void removeLiterals(Literal literal)
     {
         if (literal.id !in clausesContainingLiteral)
@@ -139,23 +182,21 @@ struct CNF
                 }
             }
         }
-        clausesContainingLiteral.remove(literal.id);
     }
 
     void removeClauseById(IDType clauseId)
     {
-        bool res = normalClauses.remove(clauseId)
-            || unitClauses.remove(clauseId) || emptyClauses.remove(clauseId);
-        if (res)
-            allClauses.remove(clauseId);
+        normalClauses.remove(clauseId);
+        unitClauses.remove(clauseId);
+        emptyClauses.remove(clauseId);
+        allClauses.remove(clauseId);
     }
 
     void removeClauseContainingLiteral(Literal literal)
     {
-        if (literal.id !in clausesContainingLiteral)
-            return;
         foreach (id; clausesContainingLiteral[literal.id])
             removeClauseById(id);
+        clausesContainingLiteral.remove(literal.id);
     }
 
     void simplify(Literal literal)
@@ -167,14 +208,18 @@ struct CNF
     string toString() const
     {
         if (allClauses.length == 0)
-            return "<empty>";
-        return format("%((%s)∨%))", allClauses.values);
+            return "<none>";
+        const(Clause)[] tmp;
+        foreach (key; allClauses.keys.sort)
+        {
+            tmp ~= allClauses[key];
+        }
+        return format("%((%s)∧%))", tmp);
     }
 
     debug string debugString() const
     {
-        return format("%(%s\n%)", [
-                allClauses, normalClauses, unitClauses, emptyClauses
-                ]);
+        return format("all: %s\nnormal:%s\nunit:%s\nempty:%s\nclcon:%s", allClauses,
+                normalClauses, unitClauses, emptyClauses, clausesContainingLiteral);
     }
 }

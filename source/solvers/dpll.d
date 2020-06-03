@@ -16,15 +16,17 @@ SolverResult solve(CNF F)
     return dpll(F, Assignment(F.variableNum));
 }
 
+ulong k;
 SolverResult dpll(CNF F, Assignment assignment)
 {
-    debug F.debugString.writeln;
-    debug writefln("CNF: %s, asgn: %s", F, assignment);
-
+    k++;
+    debug "===== %d".writefln(k);
+    debug F.writeln;
+    debug assignment.writeln;
     auto uPRes = unitPropagate(F, assignment);
     F = uPRes.F, assignment = uPRes.assignment;
-
-    debug writefln("p: CNF: %s, asgn: %s", F, assignment);
+    debug F.writeln;
+    debug assignment.writeln;
 
     // if there exists an empty clause
     if (F.emptyClauses.length > 0)
@@ -37,30 +39,39 @@ SolverResult dpll(CNF F, Assignment assignment)
         return SolverResult(null);
     Literal l = assignment.getUnassignedLiteral();
 
-    CNF F_l = F;
-    Assignment asgn1 = assignment;
+    CNF F_l = CNF(F);
+    Assignment asgn1 = Assignment(assignment);
     F_l.simplify(l);
-    asgn1.assign(l, true);
+    asgn1.assign(l);
+
     auto res1 = dpll(F_l, asgn1);
     if (res1.peek!Assignment)
         return SolverResult(res1);
 
-    CNF F_lnotl = F;
-    Assignment asgn2 = assignment;
+    debug "************test".writeln;
+    debug F.writeln;
+    CNF F_lnotl = CNF(F);
+    Assignment asgn2 = Assignment(assignment);
     F_lnotl.simplify(l.negate);
-    asgn2.assign(l, false);
+    asgn2.assign(l);
+
     return dpll(F_lnotl, asgn2);
 }
 
 unitPropagateResult unitPropagate(CNF F, Assignment assignment)
 {
+    debug F.debugString.writeln;
     while (F.emptyClauses.length == 0 && F.unitClauses.length > 0)
     {
         auto k = F.unitClauses.keys[0], v = F.unitClauses[k];
         Literal x = v.unitLiteral;
 
         F.simplify(x);
-        assignment.assign(x, true);
+        assignment.assign(x);
+        debug "up".writeln;
+        debug F.writeln;
+        debug F.debugString.writeln;
+        debug writeln;
 
     }
 

@@ -9,10 +9,10 @@ void main()
 	auto res = parseClauses().solve;
 	if (res.peek!Assignment)
 	{
-		writeln("SAT");
+		writeln("SATISFIABLE");
 		res.get!0.writeln;
 	}
 	else
-		writeln("UNSAT");
+		writeln("UNSATISFIABLE");
 
 }

@@ -26,14 +26,25 @@ struct Assignment
 
     }
 
+    this(Assignment rhs)
+    {
+        _assignment = rhs._assignment.dup;
+        unassigned = rhs.unassigned.dup;
+    }
+
     void clear()
     {
         _assignment.clear();
     }
 
-    void assign(Literal literal, bool truth)
+    void assign(Literal literal)
     {
-        _assignment[literal.variable] = truth;
+        bool truth = !literal.isNegated;
+        this._assignment[literal.variable] = truth;
+        if (literal.positive() !in unassigned)
+        {
+            debug writefln("not found: %s", literal);
+        }
         unassigned.removeKey(literal);
     }
 
@@ -49,11 +60,11 @@ struct Assignment
 
     bool getTruthOfVariable(Variable variable)
     {
-        return _assignment[variable];
+        return this._assignment[variable];
     }
 
     string toString() const
     {
-        return _assignment.to!string;
+        return this._assignment.to!string;
     }
 }
