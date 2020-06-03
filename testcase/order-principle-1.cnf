@@ -1,0 +1,11 @@
+c Ordering principle
+c  on graph .
+c
+c Generated with `cnfgen`
+c (C) 2012-2019 Massimo Lauria <massimo.lauria@uniroma1.it>
+c https://massimolauria.net/cnfgen
+c
+c COMMAND LINE: cnfgen op 1
+c
+p cnf 0 1
+0
