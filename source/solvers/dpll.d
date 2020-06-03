@@ -13,7 +13,17 @@ alias unitPropagateResult = Tuple!(CNF, "F", Assignment, "assignment");
 
 SolverResult solve(CNF F)
 {
-    return dpll(F, Assignment(F.variableNum));
+    auto res = dpll(F, Assignment(F.variableNum));
+    debug "DPLL Done!".writeln;
+    if (res.peek!Assignment)
+    {
+        auto tmp = res.get!0;
+        debug tmp.toDIMACSFormat.writeln;
+        tmp.fillUnassignedLiterals();
+        debug tmp.toDIMACSFormat.writeln;
+        res = tmp;
+    }
+    return res;
 }
 
 ulong k;

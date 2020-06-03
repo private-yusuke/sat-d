@@ -1,5 +1,6 @@
 module dimacs;
 import cnf;
+import solvers.dpll : SolverResult, Null;
 import std.stdio : readln, stdin, writeln;
 import std.array : array, join;
 import std.string : split;
@@ -106,6 +107,13 @@ CNF parseClauses()
         error("Unexpected End of File");
 
     return CNF(clauses, preamble);
+}
+
+string solverResultToString(SolverResult sr)
+{
+    if (sr.peek!Null)
+        return "s UNSATISFIABLE";
+    return format("s SATISFIABLE\n%s", sr.get!0.toDIMACSFormat());
 }
 
 private:

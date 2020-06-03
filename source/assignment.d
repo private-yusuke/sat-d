@@ -5,18 +5,18 @@ import std.container : redBlackTree, RedBlackTree;
 import std.range : iota, front, array, empty;
 import std.array : array;
 import std.conv : to;
-import std.algorithm : map;
+import std.algorithm : map, sort;
 import std.string : format;
+import std.math : abs;
 
 debug import std.stdio;
 
 public:
-
 alias Variable = string;
 
 struct Assignment
 {
-    bool[Variable] _assignment;
+    bool[IDType] _assignment;
     RedBlackTree!Literal unassigned;
 
     this(IDType variableNum)
@@ -40,7 +40,7 @@ struct Assignment
     void assign(Literal literal)
     {
         bool truth = !literal.isNegated;
-        this._assignment[literal.variable] = truth;
+        this._assignment[abs(literal.id)] = truth;
         if (literal.positive() !in unassigned)
         {
             debug writefln("not found: %s", literal);
@@ -58,13 +58,30 @@ struct Assignment
         return this.unassigned.array.front;
     }
 
-    bool getTruthOfVariable(Variable variable)
+    bool getTruthOfVariable(IDType id)
     {
-        return this._assignment[variable];
+        return this._assignment[id];
     }
 
     string toString() const
     {
         return this._assignment.to!string;
+    }
+
+    void fillUnassignedLiterals()
+    {
+        debug unassigned.writeln;
+        foreach (literal; unassigned.array)
+        {
+            this.assign(literal);
+        }
+    }
+
+    string toDIMACSFormat() const
+    {
+        IDType[] arr;
+        foreach (key; _assignment.keys.sort)
+            arr ~= (_assignment[key] ? key : -key);
+        return format("v%( %d%) 0", arr);
     }
 }
