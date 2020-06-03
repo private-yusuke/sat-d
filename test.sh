@@ -1,7 +1,7 @@
 for i in `find testcase -name "*.cnf"`; do
     predict=`./sat-d < $i | head -n 1 | sed -e 's/s //'`
     answer=`minisat -verb=0 $i | tr -d '\n' | sed -e 's/.*precision//g'`
-    flag=0
+    
     if test "$predict" != "$answer"; then
         echo "bad"
         echo "predict: $predict"
@@ -10,6 +10,4 @@ for i in `find testcase -name "*.cnf"`; do
     fi
 done
 
-if [ $flag = 0 ]; then
-    echo "ok"
-fi
+echo "ok"
