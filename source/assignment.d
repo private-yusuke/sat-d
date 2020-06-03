@@ -48,11 +48,6 @@ struct Assignment
         unassigned.removeKey(literal);
     }
 
-    bool hasUnassignedLiteral()
-    {
-        return !this.unassigned.array.empty;
-    }
-
     Literal getUnassignedLiteral()
     {
         return this.unassigned.array.front;

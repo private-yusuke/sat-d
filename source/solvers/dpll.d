@@ -45,8 +45,6 @@ SolverResult dpll(CNF F, Assignment assignment)
     if (F.allClauses.length == 0)
         return SolverResult(assignment);
 
-    if (!assignment.hasUnassignedLiteral)
-        return SolverResult(null);
     Literal l = assignment.getUnassignedLiteral();
 
     CNF F_l = CNF(F);
