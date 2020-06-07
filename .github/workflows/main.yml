@@ -1,0 +1,28 @@
+name: Run all D Tests
+
+on: [push, pull_request]
+
+jobs:
+  test-ubuntu:
+    name: test-ubuntu
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        dc: [dmd-latest, ldc-latest]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: D Compiler Installation
+        uses: dlang-community/setup-dlang@v1
+        with:
+          compiler: ${{ matrix.dc }}
+
+      - name: Install minisat
+        run: |
+          sudo apt update
+          sudo apt install -y minisat
+
+      - name: Run tests
+        run: make test
