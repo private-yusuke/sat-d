@@ -2,9 +2,10 @@ module cnf;
 import std.container : redBlackTree, RedBlackTree;
 import std.array : array;
 import std.algorithm : count, sort;
+import std.conv : to;
 import std.string : format;
 import std.range : empty, zip;
-import std.math : abs;
+import std.math : abs, sgn;
 import dimacs;
 
 debug import std.stdio;
@@ -19,10 +20,39 @@ struct Literal
     bool isNegated;
     IDType id;
 
+    this(string variable,bool isNegated,IDType id) {
+        this.variable = variable;
+        this.isNegated = isNegated;
+        this.id =id;
+    }
+
+    this(IDType id) {
+        this.variable = abs(id).to!string;
+        this.isNegated = (sgn(id) == 1 ? true : false);
+        this.id = id;
+    }
+
+    /// for copying the given literal
+    this(Literal literal) {
+        this.variable = literal.variable;
+        this.isNegated =  literal.isNegated;
+        this.id = literal.id;
+    }
+
     // "a < b"
     long opCmp(ref const Literal rhs) const
     {
         return this.id - rhs.id;
+    }
+
+    auto opUnary(string op)()
+    {
+        if(op == "-") {
+            Literal res = Literal(this);
+            res.isNegated = !this.isNegated;
+            res.id = -this.id;
+            return res;
+        } else assert(0);
     }
 
     Literal negate()
