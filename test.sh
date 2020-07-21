@@ -4,7 +4,7 @@ for i in `find testcase -name "*.cnf"`; do
     answer=`minisat -verb=0 $i | tr -d '\n' | sed -e 's/.*precision//g'`
     
     if test "$predict" != "$answer"; then
-        echo "bad"
+        echo "bad: $i"
         echo "predict: $predict"
         echo "answer: $answer"
         exit 1
