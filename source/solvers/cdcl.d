@@ -4,7 +4,7 @@ import cnf : CNF;
 import std.container : RedBlackTree, redBlackTree;
 import std.typecons : Tuple;
 import std.algorithm : each;
-import std.range : front, popFront;
+import std.range : front, popFront, iota;
 
 alias Set(T) = RedBlackTree!T;
 
@@ -188,6 +188,7 @@ class CDCLSolver {
         debug writeln("ok2");
         this.originalClauses = this.clauses.dup;
         usedIDNum = clauses.length;
+        unassignedVariables = redBlackTree!long(iota(1, clauses.length+1).array.to!(long[]));
     }
 
     /// for deep copy
@@ -306,7 +307,11 @@ class CDCLSolver {
         with(ImplicationGraph) {
             Node fromNode = Node(from, this.currentLevel), toNode = Node(to, this.currentLevel);
             assert(fromNode in implicationGraph.nodes && toNode in implicationGraph.nodes);
+            if(fromNode !in implicationGraph.successors)
+                implicationGraph.successors[fromNode] = redBlackTree!Node;
             implicationGraph.successors[fromNode].insert(toNode);
+            if(fromNode !in implicationGraph.predecessors)
+                implicationGraph.predecessors[fromNode] = redBlackTree!Node;
             implicationGraph.predecessors[toNode].insert(fromNode);
             implicationGraph.edges[fromNode][toNode] = clauseID;
         }
