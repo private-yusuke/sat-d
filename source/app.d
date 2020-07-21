@@ -13,8 +13,12 @@ void main()
 	// solverResultToString(res).writeln;
 	// write("testcase file: ");
 	// stdout.flush();
+	// CDCLSolver solver = new CDCLSolver(parseInput(File("testcase/graph-ordering-3-sat.cnf")));
 	CDCLSolver solver = new CDCLSolver(parseInput());
 	auto result = solver.solve();
-	if(result == null) writeln("s UNSATISFIABLE");
-	else writeln("s SATISFIABLE");
+	if(result == []) writeln("s UNSATISFIABLE");
+	else {
+		writeln("s SATISFIABLE");
+		result.writeln;
+	}
 }

@@ -3,8 +3,12 @@ import dimacs;
 import cnf : CNF;
 import std.container : RedBlackTree, redBlackTree;
 import std.typecons : Tuple;
-import std.algorithm : each;
+import std.algorithm : each, any, sort;
 import std.range : front, popFront, iota;
+import std.math : abs;
+import std.string : format;
+
+import std.stdio;
 
 alias Set(T) = RedBlackTree!T;
 
@@ -57,6 +61,10 @@ struct Clause {
     bool opBinaryRight(string op)(Literal lit) const if (op == "in")
     {
         return lit in literals;
+    }
+
+    string toString() {
+        return format("%(%d ∨ %)", literals.array);
     }
 }
 
@@ -122,20 +130,30 @@ struct ImplicationGraph {
         }
     }
 
+    Node getNode(Literal lit) {
+        // stderr.writeln("getNode");
+        // stderr.writeln(lit);
+        // stderr.writeln(nodes.array.filter!(n => n.literal == lit));
+        return nodes.array.filter!(n => n.literal == lit).front;
+    }
+
     Literal find1UIP(Node start, Node end) {
         foreach_reverse(node; getTopologicallySorted(start, end)) {
             ImplicationGraph tmpGraph = ImplicationGraph(this);
-            foreach(predecessor; tmpGraph.predecessors[node])
-                tmpGraph.successors[predecessor].removeKey(node);
-            foreach(successor; tmpGraph.successors[node])
-                tmpGraph.predecessors[successor].removeKey(node);
+            if(node in tmpGraph.predecessors)
+                foreach(predecessor; tmpGraph.predecessors[node])
+                    tmpGraph.successors[predecessor].removeKey(node);
+            if(node in tmpGraph.successors)
+                foreach(successor; tmpGraph.successors[node])
+                    tmpGraph.predecessors[successor].removeKey(node);
             
             Node[] queue = [start];
             while(!queue.empty) {
                 Node n = queue.front;
                 queue.popFront();
-                if(end in tmpGraph.successors) return n.literal;
-                queue ~= tmpGraph.successors[n].array;
+                if(end in tmpGraph.successors) return node.literal;
+                if(n in tmpGraph.successors)
+                    queue ~= tmpGraph.successors[n].array;
             }
         }
         // decision literal
@@ -151,6 +169,7 @@ struct ImplicationGraph {
             Node n = arr.front;
             arr.popFront();
             topologicallySorted ~= n;
+            if(n !in tmpGraph.successors) continue;
             foreach(successor; tmpGraph.successors[n]) {
                 tmpGraph.successors[n].removeKey(successor);
                 tmpGraph.predecessors[successor].removeKey(n);
@@ -162,8 +181,6 @@ struct ImplicationGraph {
         return topologicallySorted;
     }
 }
-
-debug import std.stdio;
 
 /// CDCL を実装した Solver
 class CDCLSolver {
@@ -179,16 +196,15 @@ class CDCLSolver {
     CDCLSolver[] history;
 
     this(Clause[] clauses) {
-        debug writeln("ok");
         foreach(clause; clauses) {
             this.clauses[clause.id] = clause;
             if(clause.isUnitClause) unitClauses.insert(clause.id);
             availClauses.insert(clause.id);
+            stderr.writefln("%d: %s", clause.id, clause);
         }
-        debug writeln("ok2");
         this.originalClauses = this.clauses.dup;
         usedIDNum = clauses.length;
-        unassignedVariables = redBlackTree!long(iota(1, clauses.length+1).array.to!(long[]));
+        unassignedVariables = redBlackTree!long(iota(1, clauses.length).array.to!(long[]));
     }
 
     /// for deep copy
@@ -211,11 +227,14 @@ class CDCLSolver {
             decideNextBranch();
             with(SolverStatus) while(true) {
                 SolverStatus status = deduce();
+                stderr.writefln("Deduce done. nodes: %(%s, %)", implicationGraph.nodes.array.map!(
+                    p => format("(%d, %d)", p[0], p[1])
+                ));
                 if(status == SAT) return implicationGraph.nodes.array.map!(node => node.literal).array;
                 if(status == CONFLICT) {
                     auto res = analyzeConflict();
-                    if(res.dlevel == 0) return null;
-                    backtrack(res.dlevel);
+                    if(res.dlevel == 0) return [];
+                    backtrack(res.dlevel - 1);
                     addConflictClause(res.conflict);
                 }
                 else break;
@@ -228,25 +247,35 @@ class CDCLSolver {
 
         Literal lit = unassignedVariables.front;
         unassignedVariables.removeKey(lit);
+        stderr.writefln("decision literal: %d", lit);
+        currentLevel++;
         assignLiteral(lit);
         implicationGraph.newestDecisionLiteral = lit;
     }
 
     SolverStatus deduce() {
         while(!unitClauses.empty) {
+            stderr.writeln("=== deduce continues");
+            stderr.writefln("%((%s) ∧ %)", clauses.values.filter!(c => c.id in availClauses).array.sort!((a, b) => a.id < b.id));
+            // stderr.writefln("unit clauses: %s", unitClauses);
             Clause.ID clsID = unitClauses.front;
             unitClauses.removeKey(clsID);
             Literal lit = clauses[clsID].unitLiteral;
-            if(ImplicationGraph.Node(-lit, this.currentLevel) in implicationGraph.nodes) {
+            if(iota(0, currentLevel+1).map!(l => ImplicationGraph.Node(-lit, l))
+                .any!(n => n in implicationGraph.nodes)) {
+                stderr.writeln("GENERATE CONFLICT!");
                 assignLiteral(LAMBDA, lit);
                 addEdge(-lit, LAMBDA, 0);
                 addEdge(lit, LAMBDA, 0);
                 return SolverStatus.CONFLICT;
             }
+            // stderr.writefln("!unit clauses: %s", unitClauses);
             assignLiteral(lit);
-            foreach(oclit; this.originalClauses[clsID].literals)
+            // stderr.writefln(">unit clauses: %s", unitClauses);
+            foreach(oclit; this.originalClauses[clsID].literals.array.filter!(oclit => oclit != lit))
                 addEdge(oclit, lit, clsID);
         }
+            
 
         if(unassignedVariables.empty) return SolverStatus.SAT;
         else return SolverStatus.OK;
@@ -255,16 +284,19 @@ class CDCLSolver {
     alias analyzeConflictResult = Tuple!(size_t, "dlevel", Clause, "conflict");
     analyzeConflictResult analyzeConflict() {
         with(ImplicationGraph) {
-            if(implicationGraph.predecessors[Node(LAMBDA, currentLevel)].front.dlevel == 0)
+            // if(implicationGraph.predecessors[Node(LAMBDA, currentLevel)].front.dlevel == 0)
+            if(currentLevel == 0)
                 return analyzeConflictResult(0, Clause(0, null));
             Node start = Node(implicationGraph.newestDecisionLiteral, currentLevel);
             Node end = Node(LAMBDA, currentLevel);
-            Clause conflict = newClause(implicationGraph.find1UIP(start, end));
+            Clause conflict = newClause(-implicationGraph.find1UIP(start, end));
             return analyzeConflictResult(currentLevel, conflict);
         }
     }
 
     void backtrack(size_t dlevel) {
+        stderr.writefln("backtrack from %d to %d", currentLevel, dlevel);
+        stderr.writefln("history length: %d, currentLevel: %d", this.history.length, currentLevel);
         assert(this.history.length == currentLevel);
         CDCLSolver oldSolver = this.history[dlevel];
         this.history = this.history[0..dlevel];
@@ -282,9 +314,11 @@ class CDCLSolver {
     }
 
     void addConflictClause(Clause conflict) {
+        stderr.writefln("conflict clause: %s", conflict);
         assert(conflict.id !in clauses);
         clauses[conflict.id] = conflict;
         originalClauses[conflict.id] = conflict;
+        availClauses.insert(conflict.id);
         if(conflict.isUnitClause) unitClauses.insert(conflict.id);
     }
 
@@ -292,7 +326,9 @@ class CDCLSolver {
         with(this.implicationGraph) foreach(lit; literals) {
             addNode(lit, this.currentLevel);
             removeClausesContaining(lit);
-            removeLiteralFromClauses(lit);
+            removeLiteralFromClauses(-lit);
+            unassignedVariables.removeKey(abs(lit));
+            // stderr.writefln("availClauses: %s", availClauses);
             availClauses.array
                         .filter!(clauseID => clauses[clauseID].isUnitClause)
                         .each!(clauseID => unitClauses.insert(clauseID));
@@ -300,29 +336,43 @@ class CDCLSolver {
     }
 
     void addNode(Literal lit, size_t dlevel) {
+        stderr.writefln("new node: %s, at level %s", lit, dlevel);
         assert(implicationGraph.nodes.insert(ImplicationGraph.Node(lit, dlevel)));
     }
 
     void addEdge(Literal from, Literal to, Clause.ID clauseID) {
         with(ImplicationGraph) {
-            Node fromNode = Node(from, this.currentLevel), toNode = Node(to, this.currentLevel);
-            assert(fromNode in implicationGraph.nodes && toNode in implicationGraph.nodes);
+            stderr.writefln("Add edge from %s to %s", from, to);
+            Node fromNode = implicationGraph.getNode(from), toNode = implicationGraph.getNode(to);
             if(fromNode !in implicationGraph.successors)
                 implicationGraph.successors[fromNode] = redBlackTree!Node;
             implicationGraph.successors[fromNode].insert(toNode);
             if(fromNode !in implicationGraph.predecessors)
-                implicationGraph.predecessors[fromNode] = redBlackTree!Node;
+                implicationGraph.predecessors[toNode] = redBlackTree!Node;
             implicationGraph.predecessors[toNode].insert(fromNode);
             implicationGraph.edges[fromNode][toNode] = clauseID;
         }
     }
 
     void removeClausesContaining(Literal lit) {
-        availClauses.array
-                    .filter!(clauseID => lit in clauses[clauseID])
-                    .each!(clauseID => availClauses.removeKey(clauseID));
+        // stderr.writefln("these will be removed: %(%d, %)", availClauses.array.filter!(clauseID => lit in clauses[clauseID]));
+        foreach(clauseID; availClauses.array.filter!(clauseID => lit in clauses[clauseID])) {
+            availClauses.removeKey(clauseID);
+            unitClauses.removeKey(clauseID);
+        }
     }
     void removeLiteralFromClauses(Literal lit) {
-        availClauses.array.each!(clauseID => clauses[clauseID].removeLiteral(lit));
+        // stderr.writefln("this literal will be removed: %d", lit);
+        // stderr.writeln(availClauses.array);
+        foreach(clauseID; availClauses) {
+            // stderr.writeln(clauses[clauseID]);
+            if(!clauses[clauseID].isUnitClause)
+                clauses[clauseID].removeLiteral(lit);
+            // stderr.writeln(clauses[clauseID]);
+            if(clauses[clauseID].isUnitClause)
+                unitClauses.insert(clauseID);
+            if(clauses[clauseID].isEmptyClause)
+                unitClauses.removeKey(clauseID);
+        }
     }
 }
