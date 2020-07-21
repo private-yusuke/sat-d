@@ -11,7 +11,10 @@ void main()
 {
 	// auto res = parseClauses().solve;
 	// solverResultToString(res).writeln;
-	write("testcase file: ");
-	stdout.flush();
-	new CDCLSolver(parseInput(File(getcwd() ~ "/" ~ readln.chomp)));
+	// write("testcase file: ");
+	// stdout.flush();
+	CDCLSolver solver = new CDCLSolver(parseInput());
+	auto result = solver.solve();
+	if(result == null) writeln("s UNSATISFIABLE");
+	else writeln("s SATISFIABLE");
 }
