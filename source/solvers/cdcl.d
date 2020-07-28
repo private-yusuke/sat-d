@@ -1,5 +1,4 @@
 module solvers.cdcl;
-import dimacs;
 import cnf : CNF;
 import std.container : RedBlackTree, redBlackTree;
 import std.typecons : Tuple;
@@ -37,6 +36,15 @@ struct Clause {
     ID id;
     /// 節に含まれる Literal の集合
     Set!Literal literals;
+
+    this(ID id, Set!Literal literals) {
+        this.id = id;
+        this.literals = literals;
+    }
+    this(Clause clause) {
+        this.id = clause.id;
+        this.literals = clause.literals.dup;
+    }
     bool isEmptyClause() {
         return literals.length == 0;
     }
@@ -64,7 +72,8 @@ struct Clause {
     }
 
     string toString() {
-        return format("%(%d ∨ %)", literals.array);
+        if(literals.length == 0) return "(empty)";
+        else return format("(%(%d ∨ %))", literals.array);
     }
 }
 
@@ -78,9 +87,9 @@ import std.algorithm : filter, map;
 import std.array : join, split, array;
 import std.conv : to;
 import std.range : enumerate, empty;
-Clause[] parseInput(File f = stdin) {
-    return f.byLine.filter!(line => line[0] != 'c' && line[0] != 'p').join(" ").split.map!(to!long).array.split(0).filter!(arr => !arr.empty).array.enumerate.map!(p => Clause(p.index+1, redBlackTree!Literal(p.value))).array;
-}
+// Clause parseInput(File f = stdin) {
+//     return f.byLine.filter!(line => line[0] != 'c' && line[0] != 'p').join(" ").split.map!(to!long).array.split(0).filter!(arr => !arr.empty).array.enumerate.map!(p => Clause(p.index+1, redBlackTree!Literal(p.value))).array;
+// }
 
 struct ImplicationGraph {
     /// dlevel とは、decision level のことをさす。
@@ -95,8 +104,10 @@ struct ImplicationGraph {
 
     this(ImplicationGraph graph) {
         this.nodes = graph.nodes.dup;
-        this.successors = graph.successors.dup;
-        this.predecessors = graph.predecessors.dup;
+        foreach(key, value; graph.successors)
+            this.successors[key] = value.dup;
+        foreach(key, value; graph.predecessors)
+            this.predecessors[key] = value.dup;
         this.edges = graph.edges.dup;
         this.newestDecisionLiteral = graph.newestDecisionLiteral;
     }
@@ -170,8 +181,8 @@ struct ImplicationGraph {
             arr.popFront();
             topologicallySorted ~= n;
             if(n !in tmpGraph.successors) continue;
-            stderr.writeln(n);
-            stderr.writeln(tmpGraph.successors);
+            // stderr.writeln(n);
+            // stderr.writeln(tmpGraph.successors);
             foreach(successor; tmpGraph.successors[n].array) {
                 tmpGraph.successors[n].removeKey(successor);
                 tmpGraph.predecessors[successor].removeKey(n);
@@ -182,36 +193,55 @@ struct ImplicationGraph {
         }
         return topologicallySorted;
     }
+
+    string toDOT() {
+        string res = "digraph cdcl {\n";
+
+        foreach(from, tos; edges) {
+            foreach(to, clause; tos) {
+                res ~= format("%s -> %s [label = \"%s\"];\n", from, to, clause);
+            }
+        }
+
+        res ~= "}\n";
+        return res;
+    }
 }
 
 /// CDCL を実装した Solver
 class CDCLSolver {
     Clause[Clause.ID] clauses;
     Set!(long) unassignedVariables = redBlackTree!long;
-    Set!(Clause.ID) availClauses = redBlackTree!(Clause.ID);
+    auto availClauses = redBlackTree!("a > b", Clause.ID);
     ImplicationGraph implicationGraph;
     size_t currentLevel;
 
-    Set!(Clause.ID) unitClauses = redBlackTree!(Clause.ID);
+    auto unitClauses = redBlackTree!("a > b", Clause.ID);
     Clause[Clause.ID] originalClauses;
 
     CDCLSolver[] history;
 
-    this(Clause[] clauses) {
+    this() {}
+
+    void initialize(parseResult res) {
+        auto clauses = res.clauses;
         foreach(clause; clauses) {
             this.clauses[clause.id] = clause;
             if(clause.isUnitClause) unitClauses.insert(clause.id);
             availClauses.insert(clause.id);
             stderr.writefln("%d: %s", clause.id, clause);
         }
-        this.originalClauses = this.clauses.dup;
+        foreach(key, value; this.clauses) {
+            this.originalClauses[key] = Clause(value);
+        }
         usedIDNum = clauses.length;
-        unassignedVariables = redBlackTree!long(iota(1, clauses.length).array.to!(long[]));
+        unassignedVariables = redBlackTree!long(iota(1, res.preamble.variables+1).array.to!(long[]));
     }
 
     /// for deep copy
     this(CDCLSolver solver) {
-        this.clauses = solver.clauses.dup;
+        foreach(key, value; solver.clauses)
+            this.clauses[key] = Clause(value);
         this.unassignedVariables = solver.unassignedVariables.dup;
         this.availClauses = solver.availClauses.dup;
         this.implicationGraph = ImplicationGraph(solver.implicationGraph);
@@ -225,6 +255,8 @@ class CDCLSolver {
     }
 
     Literal[] solve() {
+        stderr.writefln("given clauses: %s", this.clauses.values);
+        if(this.clauses.values.any!(c => c.literals.length == 0)) return null;
         while(true) {
             decideNextBranch();
             with(SolverStatus) while(true) {
@@ -258,8 +290,10 @@ class CDCLSolver {
 
     SolverStatus deduce() {
         while(!unitClauses.empty) {
+            //writeln(implicationGraph.toDOT);
+            // stderr.writefln("clauses: %(%s, %)", originalClauses.values);
             stderr.writeln("=== deduce continues");
-            stderr.writefln("%((%s) ∧ %)", clauses.values.filter!(c => c.id in availClauses).array.sort!((a, b) => a.id < b.id));
+            stderr.writefln("%(%s ∧ %)", clauses.values.filter!(c => c.id in availClauses).array.sort!((a, b) => a.id < b.id));
             // stderr.writefln("unit clauses: %s", unitClauses);
             Clause.ID clsID = unitClauses.front;
             unitClauses.removeKey(clsID);
@@ -307,6 +341,7 @@ class CDCLSolver {
         this.clauses = oldSolver.clauses;
         this.unassignedVariables = oldSolver.unassignedVariables;
         this.availClauses = oldSolver.availClauses;
+        this.unitClauses = oldSolver.unitClauses.dup;
         this.implicationGraph = oldSolver.implicationGraph;
         this.currentLevel = oldSolver.currentLevel;
     }
@@ -346,11 +381,11 @@ class CDCLSolver {
     void addEdge(Literal from, Literal to, Clause.ID clauseID) {
         with(ImplicationGraph) {
             stderr.writefln("Add edge from %s to %s", from, to);
-            Node fromNode = implicationGraph.getNode(from), toNode = implicationGraph.getNode(to);
+            Node fromNode = implicationGraph.getNode(-from), toNode = implicationGraph.getNode(to);
             if(fromNode !in implicationGraph.successors)
                 implicationGraph.successors[fromNode] = redBlackTree!Node;
             implicationGraph.successors[fromNode].insert(toNode);
-            if(fromNode !in implicationGraph.predecessors)
+            if(toNode !in implicationGraph.predecessors)
                 implicationGraph.predecessors[toNode] = redBlackTree!Node;
             implicationGraph.predecessors[toNode].insert(fromNode);
             implicationGraph.edges[fromNode][toNode] = clauseID;
@@ -377,5 +412,106 @@ class CDCLSolver {
             if(clauses[clauseID].isEmptyClause)
                 unitClauses.removeKey(clauseID);
         }
+    }
+
+    Preamble parsePreamble(File f = stdin)
+    {
+        string[] inp;
+
+        // comments appear in the input is ignored
+        do
+        {
+            inp = f.readln.split;
+        }
+        while (inp.length < 1 || inp[0] == "c");
+
+        if (inp[0] != "p")
+        {
+            error("Unknown command: %s", inp[0]);
+            assert(0);
+        }
+
+        else
+        {
+            if (inp.length != 4)
+                error("Not enough arguments");
+
+            if (inp[1] != "cnf")
+                error("Given format \"%s\" not supported", inp[1]);
+
+            size_t variables, clauses;
+            try
+            {
+                variables = inp[2].to!size_t, clauses = inp[3].to!size_t;
+            }
+            catch (Exception e)
+            {
+                error("Numbers in preamble couldn't be parsed");
+            }
+            return Preamble(variables, clauses);
+        }
+    }
+    struct Preamble
+    {
+        size_t variables;
+        size_t clauses;
+    }
+    alias parseResult = Tuple!(Clause[], "clauses", Preamble, "preamble");
+    parseResult parseClauses(File f = stdin)
+    {
+        Preamble preamble = parsePreamble(f);
+        Clause[] clauses;
+        Literal[] literals;
+
+        // read until EOF then ...
+        long[] tokens;
+        try
+        {
+            tokens = f.byLineCopy.array.join(' ').split.to!(long[]);
+        }
+        catch (Exception e)
+        {
+            error("Malformed input");
+        }
+
+        foreach (token; tokens)
+        {
+            if (token == 0)
+            {
+                if (clauses.length >= preamble.clauses)
+                    error("Too many clauses");
+
+                Clause clause = newClause(literals);
+                clauses ~= clause;
+                literals = null;
+                continue;
+            }
+            if (abs(token) > preamble.variables)
+                error("Given %d but variable bound is %d", abs(token), preamble.variables);
+
+            Literal literal = token;
+            literals ~= literal;
+        }
+        if (!literals.empty)
+            error("Unexpected End of File");
+
+        return parseResult(clauses, preamble);
+    
+    }
+}
+
+// TODO: ちゃんと共通させてかけるようにする
+
+// TODO: currently loading only from stdin; perhaps from file?
+void error(A...)(string msg, A args)
+{
+    throw new DIMACSReadException(format(msg, args));
+}
+
+class DIMACSReadException : Exception
+{
+    this(string msg)
+    {
+        super(msg);
     }
 }

@@ -1,6 +1,8 @@
 #!/bin/bash
 bad=0
+cnt=0
 for i in `find testcase -name "*.cnf"`; do
+    let cnt++
     echo $i
     predict=`./sat-d < $i 2>/dev/null | head -n 1 | sed -e 's/s //'`
     answer=`minisat -verb=0 $i | tr -d '\n' | sed -e 's/.*precision//g'`
@@ -9,10 +11,11 @@ for i in `find testcase -name "*.cnf"`; do
         echo "bad: $i"
         echo "predict: $predict"
         echo "answer: $answer"
-        bad=1 
+        let bad++
     fi
 done
-if [ $bad = 1 ]; then
+echo $(expr $cnt - $bad)/$cnt cases succeeded
+if [ $bad -ge 1 ]; then
     echo "test failed!"
 	exit 1
 fi
