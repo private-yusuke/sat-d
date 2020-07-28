@@ -194,18 +194,6 @@ struct ImplicationGraph {
         return topologicallySorted;
     }
 
-    string toDOT() {
-        string res = "digraph cdcl {\n";
-
-        foreach(from, tos; edges) {
-            foreach(to, clause; tos) {
-                res ~= format("%s -> %s [label = \"%s\"];\n", from, to, clause);
-            }
-        }
-
-        res ~= "}\n";
-        return res;
-    }
 }
 
 /// CDCL を実装した Solver
@@ -218,6 +206,7 @@ class CDCLSolver {
 
     auto unitClauses = redBlackTree!("a > b", Clause.ID);
     Clause[Clause.ID] originalClauses;
+    Literal[] decisionVariables;
 
     CDCLSolver[] history;
 
@@ -246,6 +235,7 @@ class CDCLSolver {
         this.availClauses = solver.availClauses.dup;
         this.implicationGraph = ImplicationGraph(solver.implicationGraph);
         this.currentLevel = solver.currentLevel;
+        this.decisionVariables = solver.decisionVariables.dup;
     }
 
     enum SolverStatus {
@@ -261,6 +251,7 @@ class CDCLSolver {
             decideNextBranch();
             with(SolverStatus) while(true) {
                 SolverStatus status = deduce();
+                toDOT(status == SolverStatus.CONFLICT);
                 stderr.writefln("Deduce done. nodes: %(%s, %)", implicationGraph.nodes.array.map!(
                     p => format("(%d, %d)", p[0], p[1])
                 ));
@@ -285,12 +276,12 @@ class CDCLSolver {
         stderr.writefln("decision literal: %d", lit);
         currentLevel++;
         assignLiteral(lit);
+        decisionVariables ~= lit;
         implicationGraph.newestDecisionLiteral = lit;
     }
 
     SolverStatus deduce() {
         while(!unitClauses.empty) {
-            //writeln(implicationGraph.toDOT);
             // stderr.writefln("clauses: %(%s, %)", originalClauses.values);
             stderr.writeln("=== deduce continues");
             stderr.writefln("%(%s ∧ %)", clauses.values.filter!(c => c.id in availClauses).array.sort!((a, b) => a.id < b.id));
@@ -304,6 +295,9 @@ class CDCLSolver {
                 assignLiteral(LAMBDA, lit);
                 addEdge(-lit, LAMBDA, 0);
                 addEdge(lit, LAMBDA, 0);
+                
+                foreach(pred; this.originalClauses[clsID].literals.array.filter!(pred => pred != lit))
+                    addEdge(pred, lit, clsID);
                 return SolverStatus.CONFLICT;
             }
             // stderr.writefln("!unit clauses: %s", unitClauses);
@@ -311,9 +305,8 @@ class CDCLSolver {
             // stderr.writefln(">unit clauses: %s", unitClauses);
             foreach(oclit; this.originalClauses[clsID].literals.array.filter!(oclit => oclit != lit))
                 addEdge(oclit, lit, clsID);
+            toDOT(false);
         }
-            
-
         if(unassignedVariables.empty) return SolverStatus.SAT;
         else return SolverStatus.OK;
     }
@@ -342,6 +335,7 @@ class CDCLSolver {
         this.unassignedVariables = oldSolver.unassignedVariables;
         this.availClauses = oldSolver.availClauses;
         this.unitClauses = oldSolver.unitClauses.dup;
+        this.decisionVariables = oldSolver.decisionVariables;
         this.implicationGraph = oldSolver.implicationGraph;
         this.currentLevel = oldSolver.currentLevel;
     }
@@ -497,6 +491,24 @@ class CDCLSolver {
 
         return parseResult(clauses, preamble);
     
+    }
+    private int dotCounter;
+    void toDOT(bool conflict) {
+        string res = "digraph cdcl {\n";
+        if(conflict) res ~= "0 [label = \"Λ\"];\n";
+        foreach(variable; decisionVariables)
+            res ~= format("%d [shape = record, label = \"Decision variable %d at level %d\"];\n", variable, variable, implicationGraph.getNode(variable).dlevel);
+
+        foreach(from, tos; implicationGraph.edges) {
+            foreach(to, clause; tos) {
+                res ~= format("%s -> %s [label = \"%s\"];\n", from.literal, to.literal, clause == 0 ? "" : this.originalClauses[clause].toString);
+            }
+        }
+
+        res ~= "}\n";
+        import std.file;
+        std.file.write(format("%d.dot", dotCounter), res);
+        dotCounter++;
     }
 }
 
