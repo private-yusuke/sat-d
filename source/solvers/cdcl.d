@@ -170,7 +170,9 @@ struct ImplicationGraph {
             arr.popFront();
             topologicallySorted ~= n;
             if(n !in tmpGraph.successors) continue;
-            foreach(successor; tmpGraph.successors[n]) {
+            stderr.writeln(n);
+            stderr.writeln(tmpGraph.successors);
+            foreach(successor; tmpGraph.successors[n].array) {
                 tmpGraph.successors[n].removeKey(successor);
                 tmpGraph.predecessors[successor].removeKey(n);
                 if(tmpGraph.predecessors[successor].empty) {
@@ -245,6 +247,7 @@ class CDCLSolver {
     void decideNextBranch() {
         history ~= new CDCLSolver(this);
 
+        stderr.writefln("unassigned: %s", unassignedVariables);
         Literal lit = unassignedVariables.front;
         unassignedVariables.removeKey(lit);
         stderr.writefln("decision literal: %d", lit);
@@ -337,7 +340,7 @@ class CDCLSolver {
 
     void addNode(Literal lit, size_t dlevel) {
         stderr.writefln("new node: %s, at level %s", lit, dlevel);
-        assert(implicationGraph.nodes.insert(ImplicationGraph.Node(lit, dlevel)));
+        implicationGraph.nodes.insert(ImplicationGraph.Node(lit, dlevel));
     }
 
     void addEdge(Literal from, Literal to, Clause.ID clauseID) {
