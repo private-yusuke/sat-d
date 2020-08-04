@@ -108,6 +108,8 @@ struct ImplicationGraph {
             this.successors[key] = value.dup;
         foreach(key, value; graph.predecessors)
             this.predecessors[key] = value.dup;
+        foreach(key, value; graph.edges)
+            this.edges[key] = value.dup;
         this.edges = graph.edges.dup;
         this.newestDecisionLiteral = graph.newestDecisionLiteral;
     }
@@ -207,6 +209,8 @@ class CDCLSolver {
     auto unitClauses = redBlackTree!("a > b", Clause.ID);
     Clause[Clause.ID] originalClauses;
     Literal[] decisionVariables;
+    bool generateGraph = false;
+    Preamble preamble;
 
     CDCLSolver[] history;
 
@@ -225,6 +229,7 @@ class CDCLSolver {
         }
         usedIDNum = clauses.length;
         unassignedVariables = redBlackTree!long(iota(1, res.preamble.variables+1).array.to!(long[]));
+        this.preamble = res.preamble;
     }
 
     /// for deep copy
@@ -251,7 +256,8 @@ class CDCLSolver {
             decideNextBranch();
             with(SolverStatus) while(true) {
                 SolverStatus status = deduce();
-                toDOT(status == SolverStatus.CONFLICT);
+                if(status == SolverStatus.CONFLICT)
+                    toDOT(true);
                 stderr.writefln("Deduce done. nodes: %(%s, %)", implicationGraph.nodes.array.map!(
                     p => format("(%d, %d)", p[0], p[1])
                 ));
@@ -494,11 +500,19 @@ class CDCLSolver {
     }
     private int dotCounter;
     void toDOT(bool conflict) {
+        if(!generateGraph) return;
         string res = "digraph cdcl {\n";
+        res ~= "graph [layout = dot];\n";
         if(conflict) res ~= "0 [label = \"Λ\"];\n";
         foreach(variable; decisionVariables)
             res ~= format("%d [shape = record, label = \"Decision variable %d at level %d\"];\n", variable, variable, implicationGraph.getNode(variable).dlevel);
+        foreach(variable; implicationGraph.nodes.array.
+        filter!(n => this.originalClauses.array.
+        filter!(c => c.id > preamble.clauses).
+        array.any!(c => n.literal in c)))
+            res ~= format("%d [shape = parallelogram, label = \"%d from lernt clause\", fillcolor = \"#cde0b4\"];\n", variable.literal, variable.literal);
 
+        stderr.writeln(implicationGraph.edges);
         foreach(from, tos; implicationGraph.edges) {
             foreach(to, clause; tos) {
                 res ~= format("%s -> %s [label = \"%s\"];\n", from.literal, to.literal, clause == 0 ? "" : this.originalClauses[clause].toString);
