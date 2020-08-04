@@ -48,8 +48,8 @@ SolverResult dpll(CNF F, Assignment assignment)
 
     CNF F_lnotl = CNF(F);
     Assignment asgn2 = Assignment(assignment);
-    F_lnotl.simplify(l.negate);
-    asgn2.assign(l);
+    F_lnotl.simplify(-l);
+    asgn2.assign(-l);
 
     return dpll(F_lnotl, asgn2);
 }

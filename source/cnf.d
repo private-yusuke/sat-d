@@ -9,87 +9,67 @@ import dimacs;
 
 debug import std.stdio;
 
+alias Set(T) = RedBlackTree!T;
+
 public:
 
-alias IDType = long;
+/+++
++ 0 は \overline \Lambda (conflict node) を表す。
++ \cdots, -3, -2, -1, 1, 2, 3, \cdots を通常のリテラルのために利用する。
++ x > 0 であるとき、
++ 正の整数 x は、x を意味する。
++ 負の整数 -x は、\lnot x を意味する。
++/
+alias Literal = long;
+/// 節
+struct Clause {
+    alias ID = size_t;
 
-struct Literal
-{
-    string variable;
-    bool isNegated;
-    IDType id;
+    /// 節を区別するための ID
+    ID id;
+    /// 節に含まれる Literal の集合
+    Set!Literal literals;
 
-    // "a < b"
-    long opCmp(ref const Literal rhs) const
-    {
-        return this.id - rhs.id;
-    }
-
-    Literal negate()
-    {
-        this.isNegated = !this.isNegated;
-        this.id = -id;
-        return this;
-    }
-
-    Literal positive()
-    {
-        this.isNegated = false;
-        this.id = abs(this.id);
-        return this;
-    }
-
-    string toString() const
-    {
-        if (this.isNegated)
-            return format("¬%s", this.variable);
-        else
-            return this.variable;
-    }
-}
-
-struct Clause
-{
-    RedBlackTree!Literal literals;
-    IDType id;
-
-    this(Literal[] literals, IDType id)
-    {
+    this(ID id, Set!Literal literals) {
         this.id = id;
-        this.literals = redBlackTree(literals);
+        this.literals = literals;
+    }
+    this(ID id, Literal[] literals) {
+        this(id, redBlackTree!Literal(literals));
+    }
+    this(Clause clause) {
+        this.id = clause.id;
+        this.literals = clause.literals.dup;
+    }
+    bool isEmptyClause() {
+        return literals.length == 0;
+    }
+    bool isUnitClause() {
+        return literals.length == 1;
+    }
+    Literal unitLiteral() {
+        assert(this.isUnitClause());
+        return literals.front;
+    }
+    bool containsLiteral(Literal lit) {
+        return lit in literals;
+    }
+    auto removeLiteral(Literal lit) {
+        return literals.removeKey(lit);
     }
 
-    this(Clause rhs)
+    int opCmp(R)(const R other) const
     {
-        this.literals = rhs.literals.dup;
-        this.id = id;
+        return this.id < other.id;
+    }
+    bool opBinaryRight(string op)(Literal lit) const if (op == "in")
+    {
+        return lit in literals;
     }
 
-    bool isEmpty()
-    {
-        return literals.array.empty;
-    }
-
-    bool isUnit()
-    {
-        return literals.array.count == 1;
-    }
-
-    Literal unitLiteral()
-    {
-        return literals.array[0];
-    }
-
-    void removeLiteral(Literal literal)
-    {
-        literals.removeKey(literal);
-    }
-
-    string toString() const
-    {
-        if (literals.array.empty)
-            return "<empty>";
-        return format("%(%s∨%)", literals.array);
+    string toString() {
+        if(literals.length == 0) return "(empty)";
+        else return format("(%(%d ∨ %))", literals.array);
     }
 }
 
@@ -97,14 +77,14 @@ struct CNF
 {
     size_t variableNum, clauseNum;
 
-    Clause[IDType] allClauses;
+    Clause[Clause.ID] allClauses;
 
-    Clause[IDType] normalClauses; // other than "unit" or "empty" clause
-    Clause[IDType] unitClauses;
-    Clause[IDType] emptyClauses;
+    Clause[Clause.ID] normalClauses; // other than "unit" or "empty" clause
+    Clause[Clause.ID] unitClauses;
+    Clause[Clause.ID] emptyClauses;
 
-    Literal[][IDType] literalsInClause;
-    IDType[][IDType] clausesContainingLiteral;
+    Literal[][Clause.ID] literalsInClause;
+    Clause.ID[][Clause.ID] clausesContainingLiteral;
 
     this(Clause[] clauses, Preamble preamble)
     {
@@ -113,12 +93,12 @@ struct CNF
 
         foreach (clause; clauses)
         {
-            IDType cid = clause.id;
+            Clause.ID cid = clause.id;
             allClauses[cid] = clause;
 
-            if (clause.isEmpty)
+            if (clause.isEmptyClause())
                 emptyClauses[cid] = clause;
-            else if (clause.isUnit)
+            else if (clause.isUnitClause())
                 unitClauses[cid] = clause;
             else
                 normalClauses[cid] = clause;
@@ -126,7 +106,7 @@ struct CNF
             foreach (literal; clause.literals.array)
             {
                 literalsInClause[cid] ~= literal;
-                clausesContainingLiteral[literal.id] ~= clause.id;
+                clausesContainingLiteral[literal] ~= clause.id;
             }
         }
     }
@@ -160,9 +140,9 @@ struct CNF
 
     void removeLiterals(Literal literal)
     {
-        if (literal.id !in clausesContainingLiteral)
+        if (literal !in clausesContainingLiteral)
             return;
-        foreach (id; clausesContainingLiteral[literal.id])
+        foreach (id; clausesContainingLiteral[literal])
         {
             if (id in unitClauses)
             {
@@ -175,7 +155,7 @@ struct CNF
             {
                 Clause clause = normalClauses[id];
                 clause.removeLiteral(literal);
-                if (clause.isUnit)
+                if (clause.isUnitClause())
                 {
                     normalClauses.remove(id);
                     unitClauses[id] = clause;
@@ -184,7 +164,7 @@ struct CNF
         }
     }
 
-    void removeClauseById(IDType clauseId)
+    void removeClauseById(Clause.ID clauseId)
     {
         normalClauses.remove(clauseId);
         unitClauses.remove(clauseId);
@@ -194,15 +174,15 @@ struct CNF
 
     void removeClauseContainingLiteral(Literal literal)
     {
-        foreach (id; clausesContainingLiteral[literal.id])
+        foreach (id; clausesContainingLiteral[literal])
             removeClauseById(id);
-        clausesContainingLiteral.remove(literal.id);
+        clausesContainingLiteral.remove(literal);
     }
 
     void simplify(Literal literal)
     {
         this.removeClauseContainingLiteral(literal);
-        this.removeLiterals(literal.negate());
+        this.removeLiterals(-literal);
     }
 
     string toString() const

@@ -78,7 +78,7 @@ CNF parseClauses()
         error("Malformed input");
     }
 
-    IDType clauseID;
+    Clause.ID clauseID;
     foreach (token; tokens)
     {
         if (token == 0)
@@ -86,7 +86,7 @@ CNF parseClauses()
             if (clauses.length >= preamble.clauses)
                 error("Too many clauses");
 
-            Clause clause = Clause(literals, clauseID);
+            Clause clause = Clause(clauseID, literals);
             clauses ~= clause;
             literals = null;
             clauseID++;
@@ -95,12 +95,7 @@ CNF parseClauses()
         if (abs(token) > preamble.variables)
             error("Given %d but variable bound is %d", abs(token), preamble.variables);
 
-        Literal literal;
-        literal.id = token;
-        literal.variable = format("x_%d", abs(token));
-        if (token < 0)
-            literal.isNegated = true;
-
+        Literal literal = token;
         literals ~= literal;
     }
     if (!literals.empty)

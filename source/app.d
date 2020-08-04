@@ -20,10 +20,16 @@ void main(string[] args)
 
 	if(args.length >= 2 && args[1] == "true") solver.generateGraph = true;
 	// CDCLSolver solver = new CDCLSolver(parseInput());
+	import std.datetime.stopwatch;
+
+	StopWatch watch;
+	watch.start();
 	auto result = solver.solve();
-	if(result == []) writeln("s UNSATISFIABLE");
-	else {
-		writeln("s SATISFIABLE");
-		result.writeln;
-	}
+	watch.stop();
+	watch.peek.total!"usecs".writeln;
+	// if(result == []) writeln("s UNSATISFIABLE");
+	// else {
+	// 	writeln("s SATISFIABLE");
+	// 	result.writeln;
+	// }
 }

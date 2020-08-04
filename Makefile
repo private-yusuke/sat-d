@@ -5,4 +5,4 @@ test: sat-d
 	./test.sh
 
 clean:
-	rm sat-d
+	rm -f sat-d
