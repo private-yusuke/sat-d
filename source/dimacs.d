@@ -7,6 +7,8 @@ import std.string : split;
 import std.conv : to;
 import std.math : abs;
 import std.range : empty;
+import std.stdio : stdin, File;
+import std.typecons : Tuple;
 
 public:
 
@@ -15,21 +17,14 @@ public:
  * FORMAT must be "cnf"
  * VARIABLES and CLAUSES must be positive integers
 */
-struct Preamble
-{
-    size_t variables;
-    size_t clauses;
-}
-
-// TODO: currently loading only from stdin; perhaps from file?
-Preamble parsePreamble()
+Preamble parsePreamble(File f = stdin)
 {
     string[] inp;
 
     // comments appear in the input is ignored
     do
     {
-        inp = readln.split;
+        inp = f.readln.split;
     }
     while (inp.length < 1 || inp[0] == "c");
 
@@ -59,26 +54,30 @@ Preamble parsePreamble()
         return Preamble(variables, clauses);
     }
 }
-
-// TODO: same parsePreamble
-CNF parseClauses()
+struct Preamble
 {
-    Preamble preamble = parsePreamble();
+    size_t variables;
+    size_t clauses;
+}
+alias parseResult = Tuple!(Clause[], "clauses", Preamble, "preamble");
+parseResult parseClauses(File f = stdin)
+{
+    Preamble preamble = parsePreamble(f);
     Clause[] clauses;
     Literal[] literals;
+    Clause.ID id = 1;
 
     // read until EOF then ...
     long[] tokens;
     try
     {
-        tokens = stdin.byLineCopy.array.join(' ').split.to!(long[]);
+        tokens = f.byLineCopy.array.join(' ').split.to!(long[]);
     }
     catch (Exception e)
     {
         error("Malformed input");
     }
 
-    IDType clauseID;
     foreach (token; tokens)
     {
         if (token == 0)
@@ -86,27 +85,23 @@ CNF parseClauses()
             if (clauses.length >= preamble.clauses)
                 error("Too many clauses");
 
-            Clause clause = Clause(literals, clauseID);
+            Clause clause = Clause(id, literals);
             clauses ~= clause;
             literals = null;
-            clauseID++;
+            id++;
             continue;
         }
         if (abs(token) > preamble.variables)
             error("Given %d but variable bound is %d", abs(token), preamble.variables);
 
-        Literal literal;
-        literal.id = token;
-        literal.variable = format("x_%d", abs(token));
-        if (token < 0)
-            literal.isNegated = true;
-
+        Literal literal = token;
         literals ~= literal;
     }
     if (!literals.empty)
         error("Unexpected End of File");
 
-    return CNF(clauses, preamble);
+    return parseResult(clauses, preamble);
+
 }
 
 string solverResultToString(SolverResult sr)

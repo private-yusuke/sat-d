@@ -8,6 +8,7 @@ import std.conv : to;
 import std.algorithm : map, sort;
 import std.string : format;
 import std.math : abs;
+import std.stdio : stderr;
 
 debug import std.stdio;
 
@@ -16,14 +17,12 @@ alias Variable = string;
 
 struct Assignment
 {
-    bool[IDType] _assignment;
+    bool[Literal] _assignment;
     RedBlackTree!Literal unassigned;
 
-    this(IDType variableNum)
+    this(size_t variableNum)
     {
-        this.unassigned = redBlackTree!Literal(iota(1, variableNum + 1)
-                .map!(v => Literal(format("x_%d", v), false, v)).array);
-
+        this.unassigned = redBlackTree!Literal(iota(1, variableNum + 1).array.to!(Literal[]));
     }
 
     this(Assignment rhs)
@@ -39,13 +38,13 @@ struct Assignment
 
     void assign(Literal literal)
     {
-        bool truth = !literal.isNegated;
-        this._assignment[abs(literal.id)] = truth;
-        if (literal.positive() !in unassigned)
+        assert(abs(literal) !in this._assignment);
+        this._assignment[abs(literal)] = literal > 0;
+        if (abs(literal) !in unassigned)
         {
             debug writefln("not found: %s", literal);
         }
-        unassigned.removeKey(literal);
+        unassigned.removeKey(abs(literal));
     }
 
     Literal getUnassignedLiteral()
@@ -53,7 +52,7 @@ struct Assignment
         return this.unassigned.array.front;
     }
 
-    bool getTruthOfVariable(IDType id)
+    bool getTruthOfVariable(Literal id)
     {
         return this._assignment[id];
     }
@@ -65,7 +64,6 @@ struct Assignment
 
     void fillUnassignedLiterals()
     {
-        debug unassigned.writeln;
         foreach (literal; unassigned.array)
         {
             this.assign(literal);
@@ -74,7 +72,7 @@ struct Assignment
 
     string toDIMACSFormat() const
     {
-        IDType[] arr;
+        Literal[] arr;
         foreach (key; _assignment.keys.sort)
             arr ~= (_assignment[key] ? key : -key);
         return format("v%( %d%) 0", arr);
