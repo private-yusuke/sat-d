@@ -1,5 +1,6 @@
 import std.stdio;
 import dimacs;
+import cnf;
 import solvers.dpll;
 import assignment;
 import std.algorithm : each;
@@ -9,30 +10,27 @@ import std.string : chomp;
 
 void main(string[] args)
 {
-	auto res = parseClauses().solve;
-	solverResultToString(res).writeln;
-	return;
-	/*
+	// auto a = parseClauses();
+	// auto cnf = CNF(a.clauses, a.preamble);
+	// auto res = solvers.dpll.solve(cnf);
+	// solverResultToString(res).writeln;
+	// return;
+	
 	// write("testcase file: ");
 	// stdout.flush();
 	
 	CDCLSolver solver = new CDCLSolver();
 	// solver.initialize(solver.parseClauses(File("testcase/graph-ordering-5.cnf")));
-	solver.initialize(solver.parseClauses());
+	solver.initialize(parseClauses());
 
 	if(args.length >= 2 && args[1] == "true") solver.generateGraph = true;
 	// CDCLSolver solver = new CDCLSolver(parseInput());
-	import std.datetime.stopwatch;
 
-	StopWatch watch;
-	watch.start();
 	auto result = solver.solve();
-	watch.stop();
-	watch.peek.total!"usecs".writeln;
-	// if(result == []) writeln("s UNSATISFIABLE");
-	// else {
-	// 	writeln("s SATISFIABLE");
-	// 	result.writeln;
-	// }
-	*/
+	if(result == []) writeln("s UNSATISFIABLE");
+	else {
+		writeln("s SATISFIABLE");
+		result.writeln;
+	}
+	
 }

@@ -1,95 +1,27 @@
 module solvers.cdcl;
-import cnf : CNF;
+import cnf : CNF, Clause, Literal;
+import dimacs: Preamble, parseResult;
 import std.container : RedBlackTree, redBlackTree;
 import std.typecons : Tuple;
-import std.algorithm : each, any, sort;
-import std.range : front, popFront, iota;
+import std.algorithm : each, any, sort, filter, map;
+import std.range : front, popFront, iota, enumerate, empty;
 import std.math : abs;
 import std.string : format;
+import std.stdio : File, stdin;
+import std.array : join, split, array;
+import std.conv : to;
 
 import std.stdio;
 
 alias Set(T) = RedBlackTree!T;
 
-/+++
-+ 0 は \overline \Lambda (conflict node) を表す。
-+ \cdots, -3, -2, -1, 1, 2, 3, \cdots を通常のリテラルのために利用する。
-+ x > 0 であるとき、
-+ 正の整数 x は、x を意味する。
-+ 負の整数 -x は、\lnot x を意味する。
-+/
-alias Literal = long;
-
 /// LAMBDA は conflict node の意。
 const Literal LAMBDA = 0;
-
-/// 与えられた Literal を否定したものを返す。
-Literal negate(Literal lit) {
-    return -lit;
-}
-
-/// 節
-struct Clause {
-    alias ID = size_t;
-
-    /// 節を区別するための ID
-    ID id;
-    /// 節に含まれる Literal の集合
-    Set!Literal literals;
-
-    this(ID id, Set!Literal literals) {
-        this.id = id;
-        this.literals = literals;
-    }
-    this(Clause clause) {
-        this.id = clause.id;
-        this.literals = clause.literals.dup;
-    }
-    bool isEmptyClause() {
-        return literals.length == 0;
-    }
-    bool isUnitClause() {
-        return literals.length == 1;
-    }
-    Literal unitLiteral() {
-        assert(this.isUnitClause());
-        return literals.front;
-    }
-    bool containsLiteral(Literal lit) {
-        return lit in literals;
-    }
-    auto removeLiteral(Literal lit) {
-        return literals.removeKey(lit);
-    }
-
-    int opCmp(R)(const R other) const
-    {
-        return this.id < other.id;
-    }
-    bool opBinaryRight(string op)(Literal lit) const if (op == "in")
-    {
-        return lit in literals;
-    }
-
-    string toString() {
-        if(literals.length == 0) return "(empty)";
-        else return format("(%(%d ∨ %))", literals.array);
-    }
-}
 
 private Clause.ID usedIDNum;
 Clause.ID nextClauseID() {
     return ++usedIDNum;
 }
-
-import std.stdio : File, stdin;
-import std.algorithm : filter, map;
-import std.array : join, split, array;
-import std.conv : to;
-import std.range : enumerate, empty;
-// Clause parseInput(File f = stdin) {
-//     return f.byLine.filter!(line => line[0] != 'c' && line[0] != 'p').join(" ").split.map!(to!long).array.split(0).filter!(arr => !arr.empty).array.enumerate.map!(p => Clause(p.index+1, redBlackTree!Literal(p.value))).array;
-// }
 
 struct ImplicationGraph {
     /// dlevel とは、decision level のことをさす。
@@ -322,7 +254,7 @@ class CDCLSolver {
         with(ImplicationGraph) {
             // if(implicationGraph.predecessors[Node(LAMBDA, currentLevel)].front.dlevel == 0)
             if(currentLevel == 0)
-                return analyzeConflictResult(0, Clause(0, null));
+                return analyzeConflictResult(0, Clause(0, []));
             Node start = Node(implicationGraph.newestDecisionLiteral, currentLevel);
             Node end = Node(LAMBDA, currentLevel);
             Clause conflict = newClause(-implicationGraph.find1UIP(start, end));
@@ -414,90 +346,7 @@ class CDCLSolver {
         }
     }
 
-    Preamble parsePreamble(File f = stdin)
-    {
-        string[] inp;
-
-        // comments appear in the input is ignored
-        do
-        {
-            inp = f.readln.split;
-        }
-        while (inp.length < 1 || inp[0] == "c");
-
-        if (inp[0] != "p")
-        {
-            error("Unknown command: %s", inp[0]);
-            assert(0);
-        }
-
-        else
-        {
-            if (inp.length != 4)
-                error("Not enough arguments");
-
-            if (inp[1] != "cnf")
-                error("Given format \"%s\" not supported", inp[1]);
-
-            size_t variables, clauses;
-            try
-            {
-                variables = inp[2].to!size_t, clauses = inp[3].to!size_t;
-            }
-            catch (Exception e)
-            {
-                error("Numbers in preamble couldn't be parsed");
-            }
-            return Preamble(variables, clauses);
-        }
-    }
-    struct Preamble
-    {
-        size_t variables;
-        size_t clauses;
-    }
-    alias parseResult = Tuple!(Clause[], "clauses", Preamble, "preamble");
-    parseResult parseClauses(File f = stdin)
-    {
-        Preamble preamble = parsePreamble(f);
-        Clause[] clauses;
-        Literal[] literals;
-
-        // read until EOF then ...
-        long[] tokens;
-        try
-        {
-            tokens = f.byLineCopy.array.join(' ').split.to!(long[]);
-        }
-        catch (Exception e)
-        {
-            error("Malformed input");
-        }
-
-        foreach (token; tokens)
-        {
-            if (token == 0)
-            {
-                if (clauses.length >= preamble.clauses)
-                    error("Too many clauses");
-
-                Clause clause = newClause(literals);
-                clauses ~= clause;
-                literals = null;
-                continue;
-            }
-            if (abs(token) > preamble.variables)
-                error("Given %d but variable bound is %d", abs(token), preamble.variables);
-
-            Literal literal = token;
-            literals ~= literal;
-        }
-        if (!literals.empty)
-            error("Unexpected End of File");
-
-        return parseResult(clauses, preamble);
     
-    }
     private int dotCounter;
     void toDOT(bool conflict) {
         if(!generateGraph) return;

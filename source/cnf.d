@@ -21,6 +21,12 @@ public:
 + 負の整数 -x は、\lnot x を意味する。
 +/
 alias Literal = long;
+
+/// 与えられた Literal を否定したものを返す。
+Literal negate(Literal lit) {
+    return -lit;
+}
+
 /// 節
 struct Clause {
     alias ID = size_t;
