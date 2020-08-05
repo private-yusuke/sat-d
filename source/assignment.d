@@ -38,12 +38,13 @@ struct Assignment
 
     void assign(Literal literal)
     {
-        this._assignment[abs(literal)] = literal > 0 ? true : false;
+        assert(abs(literal) !in this._assignment);
+        this._assignment[abs(literal)] = literal > 0;
         if (abs(literal) !in unassigned)
         {
             debug writefln("not found: %s", literal);
         }
-        unassigned.removeKey(literal);
+        unassigned.removeKey(abs(literal));
     }
 
     Literal getUnassignedLiteral()
@@ -63,7 +64,6 @@ struct Assignment
 
     void fillUnassignedLiterals()
     {
-        stderr.writeln(unassigned);
         foreach (literal; unassigned.array)
         {
             this.assign(literal);

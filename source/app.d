@@ -1,16 +1,18 @@
 import std.stdio;
-// import dimacs;
-// import solvers.dpll;
-// import assignment;
-// import std.algorithm : each;
+import dimacs;
+import solvers.dpll;
+import assignment;
+import std.algorithm : each;
 import solvers.cdcl;
 import std.file : getcwd;
 import std.string : chomp;
 
 void main(string[] args)
 {
-	// auto res = parseClauses().solve;
-	// solverResultToString(res).writeln;
+	auto res = parseClauses().solve;
+	solverResultToString(res).writeln;
+	return;
+	/*
 	// write("testcase file: ");
 	// stdout.flush();
 	
@@ -32,4 +34,5 @@ void main(string[] args)
 	// 	writeln("s SATISFIABLE");
 	// 	result.writeln;
 	// }
+	*/
 }

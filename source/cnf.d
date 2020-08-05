@@ -84,7 +84,7 @@ struct CNF
     Clause[Clause.ID] emptyClauses;
 
     Literal[][Clause.ID] literalsInClause;
-    Clause.ID[][Clause.ID] clausesContainingLiteral;
+    Clause.ID[][Literal] clausesContainingLiteral;
 
     this(Clause[] clauses, Preamble preamble)
     {
@@ -107,6 +107,7 @@ struct CNF
             {
                 literalsInClause[cid] ~= literal;
                 clausesContainingLiteral[literal] ~= clause.id;
+                debug stderr.writeln(clause.id);
             }
         }
     }
