@@ -161,7 +161,7 @@ class CDCLSolver {
             this.clauses[clause.id] = clause;
             if(clause.isUnitClause) unitClauses.insert(clause.id);
             availClauses.insert(clause.id);
-            stderr.writefln("%d: %s", clause.id, clause);
+            debug stderr.writefln("%d: %s", clause.id, clause);
         }
         foreach(key, value; this.clauses) {
             this.originalClauses[key] = Clause(value);
@@ -189,7 +189,7 @@ class CDCLSolver {
     }
 
     Literal[] solve() {
-        stderr.writefln("given clauses: %s", this.clauses.values);
+        debug stderr.writefln("given clauses: %s", this.clauses.values);
         if(this.clauses.values.any!(c => c.literals.length == 0)) return null;
         while(true) {
             decideNextBranch();
@@ -197,7 +197,7 @@ class CDCLSolver {
                 SolverStatus status = deduce();
                 if(status == SolverStatus.CONFLICT)
                     toDOT(true);
-                stderr.writefln("Deduce done. nodes: %(%s, %)", implicationGraph.nodes.array.map!(
+                debug stderr.writefln("Deduce done. nodes: %(%s, %)", implicationGraph.nodes.array.map!(
                     p => format("(%d, %d)", p[0], p[1])
                 ));
                 if(status == SAT) return implicationGraph.nodes.array.map!(node => node.literal).array;
@@ -215,10 +215,10 @@ class CDCLSolver {
     void decideNextBranch() {
         history ~= new CDCLSolver(this);
 
-        stderr.writefln("unassigned: %s", unassignedVariables);
+        debug stderr.writefln("unassigned: %s", unassignedVariables);
         Literal lit = unassignedVariables.front;
         unassignedVariables.removeKey(lit);
-        stderr.writefln("decision literal: %d", lit);
+        debug stderr.writefln("decision literal: %d", lit);
         currentLevel++;
         assignLiteral(lit);
         decisionVariables ~= lit;
@@ -236,7 +236,7 @@ class CDCLSolver {
             Literal lit = clauses[clsID].unitLiteral;
             if(iota(0, currentLevel+1).map!(l => ImplicationGraph.Node(-lit, l))
                 .any!(n => n in implicationGraph.nodes)) {
-                stderr.writeln("GENERATE CONFLICT!");
+                debug stderr.writeln("GENERATE CONFLICT!");
                 assignLiteral(LAMBDA, lit);
                 addEdge(-lit, LAMBDA, 0);
                 addEdge(lit, LAMBDA, 0);
@@ -277,8 +277,8 @@ class CDCLSolver {
     }
 
     void backtrack(size_t dlevel) {
-        stderr.writefln("backtrack from %d to %d", currentLevel, dlevel);
-        stderr.writefln("history length: %d, currentLevel: %d", this.history.length, currentLevel);
+        debug stderr.writefln("backtrack from %d to %d", currentLevel, dlevel);
+        debug stderr.writefln("history length: %d, currentLevel: %d", this.history.length, currentLevel);
         assert(this.history.length == currentLevel);
         CDCLSolver oldSolver = this.history[dlevel];
         this.history = this.history[0..dlevel];
@@ -298,7 +298,7 @@ class CDCLSolver {
     }
 
     void addConflictClause(Clause conflict) {
-        stderr.writefln("conflict clause: %s", conflict);
+        debug stderr.writefln("conflict clause: %s", conflict);
         assert(conflict.id !in clauses);
         clauses[conflict.id] = conflict;
         originalClauses[conflict.id] = conflict;
@@ -320,13 +320,13 @@ class CDCLSolver {
     }
 
     void addNode(Literal lit, size_t dlevel) {
-        stderr.writefln("new node: %s, at level %s", lit, dlevel);
+        debug stderr.writefln("new node: %s, at level %s", lit, dlevel);
         implicationGraph.nodes.insert(ImplicationGraph.Node(lit, dlevel));
     }
 
     void addEdge(Literal from, Literal to, Clause.ID clauseID) {
         with(ImplicationGraph) {
-            stderr.writefln("Add edge from %s to %s", from, to);
+            debug stderr.writefln("Add edge from %s to %s", from, to);
             Node fromNode = implicationGraph.getNode(-from), toNode = implicationGraph.getNode(to);
             if(fromNode !in implicationGraph.successors)
                 implicationGraph.successors[fromNode] = redBlackTree!Node;
