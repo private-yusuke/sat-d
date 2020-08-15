@@ -290,6 +290,11 @@ class CDCLSolver {
         this.decisionVariables = oldSolver.decisionVariables;
         this.implicationGraph = oldSolver.implicationGraph;
         this.currentLevel = oldSolver.currentLevel;
+
+        this.unitClauses.clear();
+        availClauses.array
+                        .filter!(clauseID => clauses[clauseID].isUnitClause)
+                        .each!(clauseID => unitClauses.insert(clauseID));
     }
 
     Clause newClause(T...)(T literals) {
