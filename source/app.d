@@ -24,6 +24,15 @@ void main(string[] args)
 	solver.initialize(parseClauses());
 
 	if(args.length >= 2 && args[1] == "true") solver.generateGraph = true;
+	if(args.length >= 2 && args[1] == "benchmark") {
+		import std.datetime.stopwatch;
+		StopWatch watch;
+		watch.start;
+		auto res = solver.solve();
+		watch.stop;
+		writefln("%s,%f", res == [] ? "UNSAT" : "SAT", watch.peek.total!"usecs" / 1e6);
+		return;
+	}
 	// CDCLSolver solver = new CDCLSolver(parseInput());
 
 	auto result = solver.solve();
