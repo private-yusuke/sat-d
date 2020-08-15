@@ -83,7 +83,7 @@ struct ImplicationGraph {
     }
 
     Literal find1UIP(Node start, Node end) {
-        foreach_reverse(node; getTopologicallySorted(start, end)) {
+        foreach_reverse(node; getTopologicallySorted(start, end)[1..$ - 1]) {
             ImplicationGraph tmpGraph = ImplicationGraph(this);
             if(node in tmpGraph.predecessors)
                 foreach(predecessor; tmpGraph.predecessors[node])
@@ -92,14 +92,16 @@ struct ImplicationGraph {
                 foreach(successor; tmpGraph.successors[node])
                     tmpGraph.predecessors[successor].removeKey(node);
             
+	    bool flag = true;
             Node[] queue = [start];
             while(!queue.empty) {
                 Node n = queue.front;
                 queue.popFront();
-                if(end in tmpGraph.successors) return node.literal;
+                if(n in tmpGraph.successors && end in tmpGraph.successors[n]) flag = false;
                 if(n in tmpGraph.successors)
                     queue ~= tmpGraph.successors[n].array;
             }
+	    if(flag) return node.literal;
         }
         // decision literal
         return start.literal;
@@ -125,6 +127,7 @@ struct ImplicationGraph {
                 }
             }
         }
+	debug stderr.writeln(topologicallySorted[1..$ - 1]);
         return topologicallySorted;
     }
 
@@ -359,7 +362,7 @@ class CDCLSolver {
         filter!(n => this.originalClauses.array.
         filter!(c => c.id > preamble.clauses).
         array.any!(c => n.literal in c)))
-            res ~= format("%d [shape = parallelogram, label = \"%d from lernt clause\", fillcolor = \"#cde0b4\"];\n", variable.literal, variable.literal);
+            res ~= format("%d [shape = parallelogram, label = \"%d from learnt clause\", fillcolor = \"#cde0b4\"];\n", variable.literal, variable.literal);
 
         stderr.writeln(implicationGraph.edges);
         foreach(from, tos; implicationGraph.edges) {
