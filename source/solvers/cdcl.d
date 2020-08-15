@@ -83,7 +83,14 @@ struct ImplicationGraph {
     }
 
     Literal find1UIP(Node start, Node end) {
-        foreach_reverse(node; getTopologicallySorted(start, end)[1..$ - 1]) {
+        assert(start in nodes && end in nodes);
+        auto topSorted = getTopologicallySorted(start, end);
+        import std.algorithm : canFind;
+        debug stderr.writefln("sorted: %(%s %)", topSorted.map!(n => format("(%s, %s)", n.literal, n.dlevel)));
+        assert(topSorted.canFind(start) && topSorted.canFind(end));
+        
+        if(topSorted.length < 2) return topSorted[0].literal;
+        foreach_reverse(node; topSorted[1..$ - 1]) {
             ImplicationGraph tmpGraph = ImplicationGraph(this);
             if(node in tmpGraph.predecessors)
                 foreach(predecessor; tmpGraph.predecessors[node])
@@ -92,16 +99,17 @@ struct ImplicationGraph {
                 foreach(successor; tmpGraph.successors[node])
                     tmpGraph.predecessors[successor].removeKey(node);
             
-	    bool flag = true;
+            bool flag = true;
             Node[] queue = [start];
             while(!queue.empty) {
+                debug stderr.writefln("queue: %(%s %)", queue);
                 Node n = queue.front;
                 queue.popFront();
                 if(n in tmpGraph.successors && end in tmpGraph.successors[n]) flag = false;
                 if(n in tmpGraph.successors)
                     queue ~= tmpGraph.successors[n].array;
             }
-	    if(flag) return node.literal;
+            if(flag) return node.literal;
         }
         // decision literal
         return start.literal;
@@ -109,25 +117,21 @@ struct ImplicationGraph {
 
     Node[] getTopologicallySorted(Node start, Node end) {
         Node[] topologicallySorted;
-        Node[] arr = [start];
+        Set!Node visited = redBlackTree!Node;
         ImplicationGraph tmpGraph = ImplicationGraph(this);
 
-        while(!arr.empty) {
-            Node n = arr.front;
-            arr.popFront();
-            topologicallySorted ~= n;
-            if(n !in tmpGraph.successors) continue;
-            // stderr.writeln(n);
-            // stderr.writeln(tmpGraph.successors);
-            foreach(successor; tmpGraph.successors[n].array) {
-                tmpGraph.successors[n].removeKey(successor);
-                tmpGraph.predecessors[successor].removeKey(n);
-                if(tmpGraph.predecessors[successor].empty) {
-                    arr ~= successor;
-                }
+        void visit(Node n) {
+            if(visited.insert(n)) {
+                if(n in tmpGraph.successors)
+                    foreach(m; tmpGraph.successors[n])
+                        visit(m);
+                topologicallySorted ~= n;    
             }
         }
-	debug stderr.writeln(topologicallySorted[1..$ - 1]);
+
+        visit(start);
+
+        debug stderr.writeln(topologicallySorted);
         return topologicallySorted;
     }
 
@@ -364,7 +368,7 @@ class CDCLSolver {
         array.any!(c => n.literal in c)))
             res ~= format("%d [shape = parallelogram, label = \"%d from learnt clause\", fillcolor = \"#cde0b4\"];\n", variable.literal, variable.literal);
 
-        stderr.writeln(implicationGraph.edges);
+        // stderr.writeln(implicationGraph.edges);
         foreach(from, tos; implicationGraph.edges) {
             foreach(to, clause; tos) {
                 res ~= format("%s -> %s [label = \"%s\"];\n", from.literal, to.literal, clause == 0 ? "" : this.originalClauses[clause].toString);
