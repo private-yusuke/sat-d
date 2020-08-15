@@ -32,7 +32,7 @@ struct ImplicationGraph {
     Set!Node[Node] predecessors;
     Clause.ID[Node][Node] edges;
 
-    Literal newestDecisionLiteral;
+    Literal[] decisionLiterals;
 
     this(ImplicationGraph graph) {
         this.nodes = graph.nodes.dup;
@@ -42,8 +42,8 @@ struct ImplicationGraph {
             this.predecessors[key] = value.dup;
         foreach(key, value; graph.edges)
             this.edges[key] = value.dup;
-        this.edges = graph.edges.dup;
-        this.newestDecisionLiteral = graph.newestDecisionLiteral;
+        
+        this.decisionLiterals = graph.decisionLiterals.dup;
     }
 
     void removeLevel(size_t dlevel) {
@@ -87,10 +87,10 @@ struct ImplicationGraph {
         auto topSorted = getTopologicallySorted(start, end);
         import std.algorithm : canFind;
         debug stderr.writefln("sorted: %(%s %)", topSorted.map!(n => format("(%s, %s)", n.literal, n.dlevel)));
-        assert(topSorted.canFind(start) && topSorted.canFind(end));
+        if(!topSorted.canFind(start) || !topSorted.canFind(end)) return 0;
         
         if(topSorted.length < 2) return topSorted[0].literal;
-        foreach_reverse(node; topSorted[1..$ - 1]) {
+        foreach_reverse(node; topSorted.filter!(n => n != start && n != end).array) {
             ImplicationGraph tmpGraph = ImplicationGraph(this);
             if(node in tmpGraph.predecessors)
                 foreach(predecessor; tmpGraph.predecessors[node])
@@ -102,7 +102,7 @@ struct ImplicationGraph {
             bool flag = true;
             Node[] queue = [start];
             while(!queue.empty) {
-                debug stderr.writefln("queue: %(%s %)", queue);
+                // debug stderr.writefln("queue: %(%s %)", queue);
                 Node n = queue.front;
                 queue.popFront();
                 if(n in tmpGraph.successors && end in tmpGraph.successors[n]) flag = false;
@@ -222,14 +222,14 @@ class CDCLSolver {
         currentLevel++;
         assignLiteral(lit);
         decisionVariables ~= lit;
-        implicationGraph.newestDecisionLiteral = lit;
+        implicationGraph.decisionLiterals ~= lit;
     }
 
     SolverStatus deduce() {
         while(!unitClauses.empty) {
             // stderr.writefln("clauses: %(%s, %)", originalClauses.values);
-            stderr.writeln("=== deduce continues");
-            stderr.writefln("%(%s ∧ %)", clauses.values.filter!(c => c.id in availClauses).array.sort!((a, b) => a.id < b.id));
+            // stderr.writeln("=== deduce continues");
+            // stderr.writefln("%(%s ∧ %)", clauses.values.filter!(c => c.id in availClauses).array.sort!((a, b) => a.id < b.id));
             // stderr.writefln("unit clauses: %s", unitClauses);
             Clause.ID clsID = unitClauses.front;
             unitClauses.removeKey(clsID);
@@ -258,12 +258,19 @@ class CDCLSolver {
 
     alias analyzeConflictResult = Tuple!(size_t, "dlevel", Clause, "conflict");
     analyzeConflictResult analyzeConflict() {
-        with(ImplicationGraph) {
+        auto level = currentLevel;
+        with(ImplicationGraph) while(true) {
             // if(implicationGraph.predecessors[Node(LAMBDA, currentLevel)].front.dlevel == 0)
-            if(currentLevel == 0)
+            if(level == 0)
                 return analyzeConflictResult(0, Clause(0, []));
-            Node start = Node(implicationGraph.newestDecisionLiteral, currentLevel);
+            
+            Node start = Node(implicationGraph.decisionLiterals[level - 1], level);
             Node end = Node(LAMBDA, currentLevel);
+            auto lit = implicationGraph.find1UIP(start, end);
+            if(lit == 0) {
+                level--;
+                continue;
+            }
             Clause conflict = newClause(-implicationGraph.find1UIP(start, end));
             return analyzeConflictResult(currentLevel, conflict);
         }
