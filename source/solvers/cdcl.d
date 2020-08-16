@@ -286,10 +286,14 @@ class CDCLSolver {
         this.clauses = oldSolver.clauses;
         this.unassignedVariables = oldSolver.unassignedVariables;
         this.availClauses = oldSolver.availClauses;
-        this.unitClauses = oldSolver.unitClauses.dup;
         this.decisionVariables = oldSolver.decisionVariables;
         this.implicationGraph = oldSolver.implicationGraph;
         this.currentLevel = oldSolver.currentLevel;
+
+        this.unitClauses.clear();
+        availClauses.array
+                        .filter!(clauseID => clauses[clauseID].isUnitClause)
+                        .each!(clauseID => unitClauses.insert(clauseID));
     }
 
     Clause newClause(T...)(T literals) {
