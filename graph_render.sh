@@ -1,5 +1,2 @@
 #!/bin/sh
-for i in $(find . -name "*.dot")
-do
-    dot -Tpng $i -o $i.png
-done
+find . -name "*.dot" | xargs -P 16 -I {} dot -Tpng {} -o {}.png
