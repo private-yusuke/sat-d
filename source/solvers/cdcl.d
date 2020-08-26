@@ -98,7 +98,9 @@ struct ImplicationGraph
         // stderr.writeln("getNode");
         // stderr.writeln(lit);
         // stderr.writeln(nodes.array.filter!(n => n.literal == lit));
-        return nodes.array.filter!(n => n.literal == lit).front;
+        auto tmp = nodes.array.filter!(n => n.literal == lit);
+        assert(tmp.count == 1);
+        return tmp.front;
     }
 
     Node find1UIP(Node start, Node end, Node[] topSorted)
