@@ -382,9 +382,12 @@ class CDCLSolver
                     .map!(node => node.dlevel)
                     .array
                     .sort!("a > b")[1];
+            else
+                blevel = 0;
+
             debug stderr.writefln("reasonNodes: %(%s %)",
                     reasonNodes.array.map!(c => format("(%s, %s)", c[0], c[1])));
-            else blevel = 0;
+
             auto learningLiterals = reasonNodes.array.map!(node => -node.literal).array;
             Clause conflict = newClause(learningLiterals);
             return analyzeConflictResult(blevel, conflict);
