@@ -3,8 +3,8 @@ import cnf : CNF, Clause, Literal;
 import dimacs : Preamble, parseResult;
 import std.container : RedBlackTree, redBlackTree;
 import std.typecons : Tuple;
-import std.algorithm : each, any, sort, filter, map;
-import std.range : front, popFront, iota, enumerate, empty;
+import std.algorithm : each, any, sort, filter, map, countUntil, min, count;
+import std.range : front, popFront, iota, enumerate, empty, retro;
 import std.math : abs;
 import std.string : format;
 import std.stdio : File, stdin;
@@ -101,19 +101,16 @@ struct ImplicationGraph
         return nodes.array.filter!(n => n.literal == lit).front;
     }
 
-    Literal find1UIP(Node start, Node end)
+    Node find1UIP(Node start, Node end, Node[] topSorted)
     {
         assert(start in nodes && end in nodes);
-        auto topSorted = getTopologicallySorted(start, end);
         import std.algorithm : canFind;
 
         debug stderr.writefln("sorted: %(%s %)",
                 topSorted.map!(n => format("(%s, %s)", n.literal, n.dlevel)));
         if (!topSorted.canFind(start) || !topSorted.canFind(end))
-            return 0;
+            return end;
 
-        if (topSorted.length < 2)
-            return topSorted[0].literal;
         foreach_reverse (node; topSorted.filter!(n => n != start && n != end).array)
         {
             ImplicationGraph tmpGraph = ImplicationGraph(this);
@@ -137,13 +134,13 @@ struct ImplicationGraph
                     queue ~= tmpGraph.successors[n].array;
             }
             if (flag)
-                return node.literal;
+                return node;
         }
         // decision literal
-        return start.literal;
+        return start;
     }
 
-    Node[] getTopologicallySorted(Node start, Node end)
+    Node[] getTopologicallySorted()
     {
         Node[] topologicallySorted;
         Set!Node visited = redBlackTree!Node;
@@ -160,12 +157,36 @@ struct ImplicationGraph
             }
         }
 
-        visit(start);
+        foreach (dlevel, lit; decisionLiterals)
+            visit(Node(lit, dlevel + 1));
+        foreach (node; nodes)
+            visit(node);
 
         debug stderr.writeln(topologicallySorted);
         return topologicallySorted;
     }
 
+    Set!Node getReachablesFrom(Node node)
+    {
+        Set!Node reachableNodes = redBlackTree!Node;
+
+        Node[] queue;
+        queue ~= node;
+
+        while (!queue.empty)
+        {
+            Node n = queue.front;
+            queue.popFront();
+            if (reachableNodes.insert(n))
+            {
+                if (n in successors)
+                    foreach (succ; successors[n])
+                        queue ~= succ;
+            }
+        }
+
+        return reachableNodes;
+    }
 }
 
 /// CDCL を実装した Solver
@@ -249,9 +270,11 @@ class CDCLSolver
                 if (status == SolverStatus.CONFLICT)
                 {
                     auto res = analyzeConflict();
-                    if (res.dlevel == 0)
+                    if (res.blevel == -1)
                         return [];
-                    backtrack(res.dlevel - 1);
+
+                    //debug stderr.writefln("conflict clause: %s", res.conflict);
+                    backtrack(res.blevel);
                     addConflictClause(res.conflict);
                 }
                 else
@@ -312,7 +335,7 @@ class CDCLSolver
             return SolverStatus.OK;
     }
 
-    alias analyzeConflictResult = Tuple!(size_t, "dlevel", Clause, "conflict");
+    alias analyzeConflictResult = Tuple!(long, "blevel", Clause, "conflict");
     analyzeConflictResult analyzeConflict()
     {
         auto level = currentLevel;
@@ -321,25 +344,54 @@ class CDCLSolver
         {
             // if(implicationGraph.predecessors[Node(LAMBDA, currentLevel)].front.dlevel == 0)
             if (level == 0)
-                return analyzeConflictResult(0, Clause(0, []));
+                return analyzeConflictResult(-1, Clause(0, []));
 
             alias Node = ImplicationGraph.Node;
 
             Node start = Node(implicationGraph.decisionLiterals[level - 1], level);
             Node end = Node(LAMBDA, currentLevel);
-            auto lit = implicationGraph.find1UIP(start, end);
-            if (lit == 0)
+            Node[] topologicallySorted = implicationGraph.getTopologicallySorted();
+            auto fuip = implicationGraph.find1UIP(start, end, topologicallySorted);
+            if (fuip.literal == 0)
             {
                 level--;
                 continue;
             }
-            Clause conflict = newClause(-implicationGraph.find1UIP(start, end));
-            return analyzeConflictResult(currentLevel, conflict);
+            debug stderr.writefln("1UIP: %s", fuip);
+            // auto indexOf1UIP = countUntil(topologicallySorted, fuip);
+            // auto reasonSide = redBlackTree!Node(topologicallySorted[min(indexOf1UIP,
+            //             $ - implicationGraph.decisionLiterals.length) .. $].array);
+            auto reachablesFrom1UIP = implicationGraph.getReachablesFrom(fuip);
+            debug stderr.writefln("reachableFrom1UIP: %s",
+                    reachablesFrom1UIP.array.map!(c => format("(%s, %s)", c[0], c[1])));
+            auto reasonNodes = implicationGraph.successors[fuip].array
+                .map!(node => implicationGraph.predecessors[node].array)
+                .join
+                .filter!(node => node !in reachablesFrom1UIP || node == fuip)
+                .array
+                .redBlackTree!Node;
+
+            if (reasonNodes.array.any!(node => Node(-node.literal, node.dlevel) in reasonNodes))
+                return analyzeConflictResult(-1, Clause(0, []));
+
+            long blevel;
+            if (reasonNodes.array.length >= 2)
+                blevel = reasonNodes.array
+                    .map!(node => node.dlevel)
+                    .array
+                    .sort!("a > b")[1];
+            debug stderr.writefln("reasonNodes: %(%s %)",
+                    reasonNodes.array.map!(c => format("(%s, %s)", c[0], c[1])));
+            else blevel = 0;
+            auto learningLiterals = reasonNodes.array.map!(node => -node.literal).array;
+            Clause conflict = newClause(learningLiterals);
+            return analyzeConflictResult(blevel, conflict);
         }
     }
 
     void backtrack(size_t dlevel)
     {
+        dlevel = min(history.length - 1, dlevel);
         debug stderr.writefln("backtrack from %d to %d", currentLevel, dlevel);
         debug stderr.writefln("history length: %d, currentLevel: %d",
                 this.history.length, currentLevel);
@@ -370,11 +422,27 @@ class CDCLSolver
     {
         debug stderr.writefln("conflict clause: %s", conflict);
         assert(conflict.id !in clauses);
-        clauses[conflict.id] = conflict;
-        originalClauses[conflict.id] = conflict;
+        debug stderr.writefln("originalClauses: %s", originalClauses.values);
+        //assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
+        originalClauses[conflict.id] = Clause(conflict);
         availClauses.insert(conflict.id);
+
+        foreach (dlevel; 0 .. currentLevel)
+        {
+            history[dlevel].clauses[conflict.id] = conflict;
+            foreach (node; history[dlevel].implicationGraph.nodes)
+                history[dlevel].clauses[conflict.id].removeLiteral(-node.literal);
+            if (history[dlevel].clauses[conflict.id].isUnitClause)
+                history[dlevel].unitClauses.insert(conflict.id);
+        }
+
+        foreach (node; implicationGraph.nodes.array.filter!(node => node.literal != 0))
+            conflict.removeLiteral(-node.literal);
+
+        clauses[conflict.id] = conflict;
         if (conflict.isUnitClause)
             unitClauses.insert(conflict.id);
+        debug stderr.writefln("conflictClauseApplied: %s", conflict);
     }
 
     void assignLiteral(T...)(T literals)
@@ -466,8 +534,9 @@ class CDCLSolver
         {
             foreach (to, clause; tos)
             {
-                res ~= format("%s -> %s [label = \"%s\"];\n", from.literal,
-                        to.literal, clause == 0 ? "" : this.originalClauses[clause].toString);
+                res ~= format("%s -> %s [label = \"%s\"];\n", from.literal, to.literal, clause == 0
+                        ? "" : (clause >= preamble.clauses
+                            ? "L:" : "" ~ this.originalClauses[clause].toString));
             }
         }
 
