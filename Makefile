@@ -1,5 +1,5 @@
 sat-d:
-	dub build -b debug
+	dub build -b release
 
 test: sat-d
 	./test.sh
