@@ -3,7 +3,7 @@
 cnt=0
 bad=0
 mode="randkcnf"
-args="4 6 60"
+args="1 5 10"
 git_latest=$(git log --oneline | head -n 1 | cut -d' ' -f 1)
 while [ $bad -lt 10 ]
 do
