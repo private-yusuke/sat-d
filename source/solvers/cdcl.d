@@ -108,8 +108,8 @@ struct ImplicationGraph
         assert(start in nodes && end in nodes);
         import std.algorithm : canFind;
 
-        debug stderr.writefln("sorted: %(%s %)",
-                topSorted.map!(n => format("(%s, %s)", n.literal, n.dlevel)));
+        // debug stderr.writefln("sorted: %(%s %)",
+        //         topSorted.map!(n => format("(%s, %s)", n.literal, n.dlevel)));
         if (!topSorted.canFind(start) || !topSorted.canFind(end))
             return end;
 
@@ -164,7 +164,7 @@ struct ImplicationGraph
         foreach (node; nodes)
             visit(node);
 
-        debug stderr.writeln(topologicallySorted);
+        // debug stderr.writeln(topologicallySorted);
         return topologicallySorted;
     }
 
@@ -259,14 +259,13 @@ class CDCLSolver
             return null;
         while (true)
         {
-            decideNextBranch();
             while (true)
             {
                 SolverStatus status = deduce();
                 if (status == SolverStatus.CONFLICT)
                     toDOT(true);
-                debug stderr.writefln("Deduce done. nodes: %(%s, %)",
-                        implicationGraph.nodes.array.map!(p => format("(%d, %d)", p[0], p[1])));
+                // debug stderr.writefln("Deduce done. nodes: %(%s, %)",
+                //         implicationGraph.nodes.array.map!(p => format("(%d, %d)", p[0], p[1])));
                 if (status == SolverStatus.SAT)
                     return implicationGraph.nodes.array.map!(node => node.literal).array;
                 if (status == SolverStatus.CONFLICT)
@@ -282,6 +281,7 @@ class CDCLSolver
                 else
                     break;
             }
+            decideNextBranch();
         }
     }
 
@@ -289,10 +289,10 @@ class CDCLSolver
     {
         history ~= new CDCLSolver(this);
 
-        debug stderr.writefln("unassigned: %s", unassignedVariables);
+        // debug stderr.writefln("unassigned: %s", unassignedVariables);
         Literal lit = unassignedVariables.front;
         unassignedVariables.removeKey(lit);
-        debug stderr.writefln("decision literal: %d", lit);
+        // debug stderr.writefln("decision literal: %d", lit);
         currentLevel++;
         assignLiteral(lit);
         decisionVariables ~= lit;
@@ -313,7 +313,7 @@ class CDCLSolver
             if (iota(0, currentLevel + 1).map!(l => ImplicationGraph.Node(-lit, l))
                     .any!(n => n in implicationGraph.nodes))
             {
-                debug stderr.writeln("GENERATE CONFLICT!");
+                // debug stderr.writeln("GENERATE CONFLICT!");
                 assignLiteral(LAMBDA, lit);
                 addEdge(-lit, LAMBDA, 0);
                 addEdge(lit, LAMBDA, 0);
@@ -364,8 +364,8 @@ class CDCLSolver
             // auto reasonSide = redBlackTree!Node(topologicallySorted[min(indexOf1UIP,
             //             $ - implicationGraph.decisionLiterals.length) .. $].array);
             auto reachablesFrom1UIP = implicationGraph.getReachablesFrom(fuip);
-            debug stderr.writefln("reachableFrom1UIP: %s",
-                    reachablesFrom1UIP.array.map!(c => format("(%s, %s)", c[0], c[1])));
+            // debug stderr.writefln("reachableFrom1UIP: %s",
+            //         reachablesFrom1UIP.array.map!(c => format("(%s, %s)", c[0], c[1])));
             auto reasonNodes = implicationGraph.successors[fuip].array
                 .map!(node => implicationGraph.predecessors[node].array)
                 .join
@@ -427,14 +427,14 @@ class CDCLSolver
     {
         debug stderr.writefln("conflict clause: %s", conflict);
         assert(conflict.id !in clauses);
-        debug stderr.writefln("originalClauses: %s", originalClauses.values);
-        //assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
+        // debug stderr.writefln("originalClauses: %s", originalClauses.values);
+        assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
         originalClauses[conflict.id] = Clause(conflict);
         availClauses.insert(conflict.id);
 
         foreach (dlevel; 0 .. currentLevel)
         {
-            history[dlevel].clauses[conflict.id] = conflict;
+            history[dlevel].clauses[conflict.id] = Clause(conflict);
             foreach (node; history[dlevel].implicationGraph.nodes)
                 history[dlevel].clauses[conflict.id].removeLiteral(-node.literal);
             if (history[dlevel].clauses[conflict.id].isUnitClause)
@@ -467,7 +467,7 @@ class CDCLSolver
 
     void addNode(Literal lit, size_t dlevel)
     {
-        debug stderr.writefln("new node: %s, at level %s", lit, dlevel);
+        // debug stderr.writefln("new node: %s, at level %s", lit, dlevel);
         implicationGraph.nodes.insert(ImplicationGraph.Node(lit, dlevel));
     }
 
@@ -475,7 +475,7 @@ class CDCLSolver
     {
         alias Node = ImplicationGraph.Node;
 
-        debug stderr.writefln("Add edge from %s to %s", from, to);
+        // debug stderr.writefln("Add edge from %s to %s", from, to);
         Node fromNode = implicationGraph.getNode(-from), toNode = implicationGraph.getNode(to);
         if (fromNode !in implicationGraph.successors)
             implicationGraph.successors[fromNode] = redBlackTree!Node;
@@ -517,6 +517,8 @@ class CDCLSolver
     private int dotCounter;
     void toDOT(bool conflict)
     {
+        if (conflict)
+            debug stderr.writefln("conflict exported: %d", dotCounter);
         if (!generateGraph)
             return;
         string res = "digraph cdcl {\n";
