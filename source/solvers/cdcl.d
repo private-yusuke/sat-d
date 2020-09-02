@@ -10,6 +10,7 @@ import std.string : format;
 import std.stdio : File, stdin;
 import std.array : join, split, array;
 import std.conv : to;
+import std.variant : Algebraic;
 
 import std.stdio;
 
@@ -252,11 +253,14 @@ class CDCLSolver
         OK
     }
 
-    Literal[] solve()
+    alias CDCLSolverResult = Algebraic!(Literal[], typeof(null));
+
+    CDCLSolverResult solve()
     {
         debug stderr.writefln("given clauses: %s", this.clauses.values);
+
         if (this.clauses.values.any!(c => c.literals.length == 0))
-            return null;
+            return CDCLSolverResult(null);
         while (true)
         {
             while (true)
@@ -267,12 +271,13 @@ class CDCLSolver
                 // debug stderr.writefln("Deduce done. nodes: %(%s, %)",
                 //         implicationGraph.nodes.array.map!(p => format("(%d, %d)", p[0], p[1])));
                 if (status == SolverStatus.SAT)
-                    return implicationGraph.nodes.array.map!(node => node.literal).array;
+                    return CDCLSolverResult(implicationGraph.nodes.array.map!(node => node.literal)
+                            .array);
                 if (status == SolverStatus.CONFLICT)
                 {
                     auto res = analyzeConflict();
                     if (res.blevel == -1)
-                        return [];
+                        return CDCLSolverResult(null);
 
                     //debug stderr.writefln("conflict clause: %s", res.conflict);
                     backtrack(res.blevel);

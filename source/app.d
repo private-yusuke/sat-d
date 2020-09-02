@@ -15,31 +15,37 @@ void main(string[] args)
 	// auto res = solvers.dpll.solve(cnf);
 	// solverResultToString(res).writeln;
 	// return;
-	
+
 	// write("testcase file: ");
 	// stdout.flush();
-	
+
 	CDCLSolver solver = new CDCLSolver();
 	// solver.initialize(solver.parseClauses(File("testcase/graph-ordering-5.cnf")));
 	solver.initialize(parseClauses());
 
-	if(args.length >= 2 && args[1] == "true") solver.generateGraph = true;
-	if(args.length >= 2 && args[1] == "benchmark") {
+	if (args.length >= 2 && args[1] == "true")
+		solver.generateGraph = true;
+	if (args.length >= 2 && args[1] == "benchmark")
+	{
 		import std.datetime.stopwatch;
+
 		StopWatch watch;
 		watch.start;
 		auto res = solver.solve();
 		watch.stop;
-		writefln("%s,%f", res == [] ? "UNSAT" : "SAT", watch.peek.total!"usecs" / 1e6);
+		writefln("%s,%f", res.peek!(typeof(null)) ? "UNSAT" : "SAT",
+				watch.peek.total!"usecs" / 1e6);
 		return;
 	}
 	// CDCLSolver solver = new CDCLSolver(parseInput());
 
 	auto result = solver.solve();
-	if(result == []) writeln("s UNSATISFIABLE");
-	else {
+	if (result.peek!(typeof(null)))
+		writeln("s UNSATISFIABLE");
+	else
+	{
 		writeln("s SATISFIABLE");
 		result.writeln;
 	}
-	
+
 }
