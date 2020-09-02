@@ -42,7 +42,7 @@ struct Assignment
         this._assignment[abs(literal)] = literal > 0;
         if (abs(literal) !in unassigned)
         {
-            debug writefln("not found: %s", literal);
+            debug stderr.writefln("not found: %s", literal);
         }
         unassigned.removeKey(abs(literal));
     }
