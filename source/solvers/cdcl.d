@@ -109,38 +109,26 @@ struct ImplicationGraph
         assert(start in nodes && end in nodes);
         import std.algorithm : canFind;
 
-        // debug stderr.writefln("sorted: %(%s %)",
-        //         topSorted.map!(n => format("(%s, %s)", n.literal, n.dlevel)));
-        if (!topSorted.canFind(start) || !topSorted.canFind(end))
-            return end;
-
-        foreach_reverse (node; topSorted.filter!(n => n != start && n != end).array)
+        Node[] queue;
+        queue ~= predecessors[end].array.filter!(node => node.dlevel == end.dlevel).array;
+        while (queue.length != 1)
         {
-            ImplicationGraph tmpGraph = ImplicationGraph(this);
-            if (node in tmpGraph.predecessors)
-                foreach (predecessor; tmpGraph.predecessors[node])
-                    tmpGraph.successors[predecessor].removeKey(node);
-            if (node in tmpGraph.successors)
-                foreach (successor; tmpGraph.successors[node])
-                    tmpGraph.predecessors[successor].removeKey(node);
-
-            bool flag = true;
-            Node[] queue = [start];
-            while (!queue.empty)
+            assert(queue.length != 0);
+            Set!Node nextQueue = redBlackTree!Node;
+            foreach (node; queue)
             {
-                // debug stderr.writefln("queue: %(%s %)", queue);
-                Node n = queue.front;
-                queue.popFront();
-                if (n in tmpGraph.successors && end in tmpGraph.successors[n])
-                    flag = false;
-                if (n in tmpGraph.successors)
-                    queue ~= tmpGraph.successors[n].array;
+                if (node in predecessors)
+                    foreach (pred; predecessors[node])
+                    {
+                        if (pred.dlevel == end.dlevel)
+                        {
+                            nextQueue.insert(pred);
+                        }
+                    }
             }
-            if (flag)
-                return node;
+            queue = nextQueue.array;
         }
-        // decision literal
-        return start;
+        return queue[0];
     }
 
     Node[] getTopologicallySorted()
