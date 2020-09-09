@@ -1,0 +1,4 @@
+testcase/graph-ordering
+testcase/handmade
+testcase/order-principle
+testcase/total-order
