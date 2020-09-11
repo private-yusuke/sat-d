@@ -104,6 +104,55 @@ struct ImplicationGraph
         return tmp.front;
     }
 
+    Set!Node get1UIPCut(size_t dlevel)
+    {
+        Set!Node res = redBlackTree!Node;
+
+        Set!Node visited = redBlackTree!Node;
+
+        Node[] queue = [Node(0, dlevel)];
+        bool found1UIP = false;
+        immutable Node decisionNode = Node(decisionLiterals[$ - 1], dlevel);
+        bool is1UIPDecisionNode = false;
+
+        while (!found1UIP)
+        {
+            Node[] nextQueue;
+            foreach (Node n; queue)
+            {
+                if (n in predecessors)
+                {
+                    foreach (pred; predecessors[n])
+                    {
+                        if (pred == decisionNode)
+                            is1UIPDecisionNode = true;
+                        if (visited.insert(pred))
+                        {
+                            if (pred.dlevel != dlevel)
+                                res.insert(pred);
+                            else
+                                nextQueue ~= pred;
+                        }
+                    }
+                }
+            }
+            if (!is1UIPDecisionNode && nextQueue.length == 1)
+            {
+                found1UIP = true;
+                res.insert(nextQueue[0]);
+            }
+            else if (nextQueue.length == 0)
+            {
+                found1UIP = true;
+                res.insert(decisionNode);
+            }
+            queue = nextQueue;
+            debug stderr.writefln("nextQueue: %s", nextQueue);
+        }
+
+        return res;
+    }
+
     Node find1UIP(Node start, Node end, Node[] topSorted)
     {
         assert(start in nodes && end in nodes);
@@ -393,40 +442,7 @@ class CDCLSolver
             if (level == 0)
                 return analyzeConflictResult(-1, Clause(0, []));
 
-            alias Node = ImplicationGraph.Node;
-
-            Node start = Node(implicationGraph.decisionLiterals[level - 1], level);
-            Node end = Node(LAMBDA, currentLevel);
-            Node[] topologicallySorted = implicationGraph.getTopologicallySorted();
-            auto fuip = implicationGraph.find1UIP(start, end, topologicallySorted);
-            if (fuip.literal == 0)
-            {
-                level--;
-                continue;
-            }
-            debug stderr.writefln("1UIP: %s", fuip);
-            // auto indexOf1UIP = countUntil(topologicallySorted, fuip);
-            // auto reasonSide = redBlackTree!Node(topologicallySorted[min(indexOf1UIP,
-            //             $ - implicationGraph.decisionLiterals.length) .. $].array);
-            auto reachablesFrom1UIP = implicationGraph.getReachablesFrom(fuip);
-            debug stderr.writefln("reachableFrom1UIP: %s",
-                    reachablesFrom1UIP.array.map!(c => format("(%s, %s)", c[0], c[1])));
-            auto reasonNodes = implicationGraph.successors[fuip].array
-                .map!(node => implicationGraph.predecessors[node].array)
-                .join
-                .filter!(node => node !in reachablesFrom1UIP || node == fuip)
-                .array
-                .redBlackTree!Node;
-
-            foreach (dlevel, dVar; decisionVariables)
-            {
-                Node n = Node(dVar, dlevel + 1);
-                if (n in implicationGraph.nodes)
-                    reasonNodes.insert(n);
-            }
-
-            if (reasonNodes.array.any!(node => Node(-node.literal, node.dlevel) in reasonNodes))
-                return analyzeConflictResult(-1, Clause(0, []));
+            auto reasonNodes = implicationGraph.get1UIPCut(currentLevel);
 
             long blevel;
             if (reasonNodes.array.length >= 2)
