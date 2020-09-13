@@ -1,5 +1,5 @@
 module solvers.cdcl;
-import cnf : CNF, Clause, Literal;
+import cnf : CNF, Clause, Literal, Set;
 import dimacs : Preamble, parseResult;
 import std.container : RedBlackTree, redBlackTree;
 import std.typecons : Tuple;
@@ -13,8 +13,6 @@ import std.conv : to;
 import std.variant : Algebraic;
 
 import std.stdio;
-
-alias Set(T) = RedBlackTree!T;
 
 /// LAMBDA は conflict node の意。
 const Literal LAMBDA = 0;
@@ -30,12 +28,17 @@ struct ImplicationGraph
     /// dlevel とは、decision level のことをさす。
     alias Node = Tuple!(Literal, "literal", size_t, "dlevel");
 
-    Set!Node nodes = redBlackTree!Node;
+    Set!Node nodes;
     Set!Node[Node] successors;
     Set!Node[Node] predecessors;
     Clause.ID[Node][Node] edges;
 
     Literal[] decisionLiterals;
+
+    void initalize()
+    {
+        nodes = redBlackTree!Node;
+    }
 
     this(ImplicationGraph graph)
     {
@@ -281,6 +284,8 @@ struct ImplicationGraph
     }
 }
 
+alias CDCLSolverResult = Algebraic!(Literal[], typeof(null));
+
 /// CDCL を実装した Solver
 class CDCLSolver
 {
@@ -300,6 +305,7 @@ class CDCLSolver
 
     this()
     {
+        implicationGraph.initalize();
     }
 
     void initialize(parseResult res)
@@ -342,14 +348,14 @@ class CDCLSolver
         OK
     }
 
-    alias CDCLSolverResult = Algebraic!(Literal[], typeof(null));
-
     CDCLSolverResult solve()
     {
         debug stderr.writefln("given clauses: %s", this.clauses.values);
 
         if (this.clauses.values.any!(c => c.literals.length == 0))
             return CDCLSolverResult(null);
+        if (this.preamble.variables == 0 && this.preamble.clauses == 0)
+            return CDCLSolverResult(cast(Literal[])[]);
         while (true)
         {
             while (true)

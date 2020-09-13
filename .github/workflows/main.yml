@@ -26,3 +26,6 @@ jobs:
 
       - name: Run tests
         run: make test
+
+      - name: Run `dub test`
+        run: dub test
