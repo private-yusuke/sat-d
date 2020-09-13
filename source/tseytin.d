@@ -108,8 +108,8 @@ tseytinTransformResult tseytinTransform(string input)
         return tseytinTransformResult(parseResult([], Preamble(0, 0)), null);
 
     auto inputExpr = Expression(input);
-    // if (inputExpr.end != input.length)
-    //     error("invalid input");
+    if (inputExpr.end != input.length)
+        error("invalid input");
 
     Expr[] expressions;
     Set!string originalVars = redBlackTree!string;
