@@ -503,7 +503,7 @@ class CDCLSolver
         debug stderr.writefln("conflict clause: %s", conflict);
         assert(conflict.id !in clauses);
         // debug stderr.writefln("originalClauses: %s", originalClauses.values);
-        // assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
+        assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
         originalClauses[conflict.id] = Clause(conflict);
         availClauses.insert(conflict.id);
 
