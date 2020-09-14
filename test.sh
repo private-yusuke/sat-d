@@ -1,6 +1,8 @@
 #!/bin/bash
+okcnt=0
 bad=0
 cnt=0
+abortcnt=0
 for i in `find testcase -name "*.cnf"`; do
     let cnt++
     echo $i
@@ -8,8 +10,9 @@ for i in `find testcase -name "*.cnf"`; do
     answer=`minisat -verb=0 $i | tr -d '\n' | sed -e 's/.*precision//g'`
     
     if test "$predict" == "ABORT"; then
-	echo "abort: $i"
-	continue
+	    echo "abort: $i"
+        let abortcnt++   
+	    continue
     fi
 
     if test "$predict" != "$answer"; then
@@ -17,9 +20,12 @@ for i in `find testcase -name "*.cnf"`; do
         echo "predict: $predict"
         echo "answer: $answer"
         let bad++
+        continue
     fi
+
+    let okcnt++
 done
-echo $(expr $cnt - $bad)/$cnt cases succeeded
+echo "$okcnt/$cnt succeeded, $bad failed, $abortcnt aborted"
 if [ $bad -ge 1 ]; then
     echo "test failed!"
 	exit 1
