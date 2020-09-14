@@ -58,12 +58,12 @@ int main(string[] args)
 			return 0;
 		}
 	}
+	solver.initialize(parseClauses());
 	if (args.length >= 2 && args[1] == "true")
 		solver.generateGraph = true;
 	if (args.length >= 2 && args[1] == "benchmark")
 	{
 		import std.datetime.stopwatch;
-
 		StopWatch watch;
 		watch.start;
 		res = solver.solve();
@@ -72,8 +72,6 @@ int main(string[] args)
 				watch.peek.total!"usecs" / 1e6);
 		return 0;
 	}
-	solver.initialize(parseClauses());
-	// CDCLSolver solver = new CDCLSolver(parseInput());
 
 	auto result = solver.solve();
 	if (result.peek!(typeof(null)))
