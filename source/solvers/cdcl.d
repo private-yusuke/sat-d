@@ -55,46 +55,56 @@ struct ImplicationGraph
 
     void removeLevel(size_t dlevel)
     {
-        foreach (node; nodes)
+        auto dlevelDecisionLit = decisionLiterals[dlevel - 1];
+        foreach (node; nodes.array)
         {
-            if (node.dlevel >= dlevel)
+            if (node.dlevel >= dlevel && node.literal != dlevelDecisionLit)
                 nodes.removeKey(node);
         }
+
         foreach (key, value; successors)
         {
-            if (key.dlevel >= dlevel)
-                successors.remove(key);
-            foreach (node; value)
+            if (key.dlevel >= dlevel && key.literal != dlevelDecisionLit)
             {
-                if (node.dlevel >= dlevel)
+                successors.remove(key);
+                continue;
+            }
+            foreach (node; value.array)
+            {
+                if (node.dlevel >= dlevel && node.literal != dlevelDecisionLit)
                     value.removeKey(node);
             }
         }
         foreach (key, value; predecessors)
         {
-            if (key.dlevel >= dlevel)
-                successors.remove(key);
-            foreach (node; value)
+            if (key.dlevel >= dlevel && key.literal != dlevelDecisionLit)
             {
-                if (node.dlevel >= dlevel)
+                successors.remove(key);
+                continue;
+            }
+            foreach (node; value.array)
+            {
+                if (node.dlevel >= dlevel && node.literal != dlevelDecisionLit)
                     value.removeKey(node);
             }
         }
         foreach (key, value; edges)
         {
-            if (key.dlevel >= dlevel)
+            if (key.dlevel >= dlevel && key.literal != dlevelDecisionLit)
             {
                 edges.remove(key);
                 continue;
             }
             foreach (key2, _; value)
             {
-                if (key2.dlevel >= dlevel)
+                if (key2.dlevel >= dlevel && key2.literal != dlevelDecisionLit)
                 {
                     value.remove(key2);
                 }
             }
         }
+        debug stderr.writefln("decisionLiterals!: %s", decisionLiterals);
+        decisionLiterals = decisionLiterals[0 .. dlevel + 1];
     }
 
     Node getNode(Literal lit)
@@ -115,6 +125,7 @@ struct ImplicationGraph
 
         Node[] queue = [Node(0, dlevel)];
         bool found1UIP = false;
+        debug stderr.writefln("decisionLiterals: %s", decisionLiterals);
         immutable Node decisionNode = Node(decisionLiterals[$ - 1], dlevel);
         bool is1UIPDecisionNode = false;
 
@@ -231,7 +242,7 @@ struct ImplicationGraph
         return reachableNodes;
     }
 
-    void transformToConflictGraph(size_t level)
+    ImplicationGraph transformToConflictGraph(size_t level)
     {
         Set!Node conflictGraphNodes = redBlackTree!Node;
         Node[] queue;
@@ -277,10 +288,14 @@ struct ImplicationGraph
             foreach (to; tos)
                 edges_[from][to] = edges[from][to];
 
-        nodes = conflictGraphNodes;
-        successors = successors_;
-        predecessors = predecessors_;
-        edges = edges_;
+        ImplicationGraph res = ImplicationGraph();
+
+        res.nodes = conflictGraphNodes;
+        res.successors = successors_;
+        res.predecessors = predecessors_;
+        res.edges = edges_;
+        res.decisionLiterals = this.decisionLiterals.dup;
+        return res;
     }
 }
 
@@ -409,6 +424,9 @@ class CDCLSolver
             Clause.ID clsID = unitClauses.front;
             unitClauses.removeKey(clsID);
             Literal lit = clauses[clsID].unitLiteral;
+            debug stderr.writefln("origC: %s", this.originalClauses[clsID]);
+            debug stderr.writefln("C: %s", this.clauses[clsID]);
+            debug stderr.writefln("UPed: %s", lit);
             if (iota(0, currentLevel + 1).map!(l => ImplicationGraph.Node(-lit, l))
                     .any!(n => n in implicationGraph.nodes))
             {
@@ -420,7 +438,6 @@ class CDCLSolver
                 foreach (pred; this.originalClauses[clsID].literals.array.filter!(
                         pred => pred != lit))
                     addEdge(pred, lit, clsID);
-                implicationGraph.transformToConflictGraph(currentLevel);
                 return SolverStatus.CONFLICT;
             }
             // stderr.writefln("!unit clauses: %s", unitClauses);
@@ -441,6 +458,7 @@ class CDCLSolver
     analyzeConflictResult analyzeConflict()
     {
         auto level = currentLevel;
+        ImplicationGraph conflictGraph = implicationGraph.transformToConflictGraph(currentLevel);
 
         while (true)
         {
@@ -448,7 +466,7 @@ class CDCLSolver
             if (level == 0)
                 return analyzeConflictResult(-1, Clause(0, []));
 
-            auto reasonNodes = implicationGraph.get1UIPCut(currentLevel);
+            auto reasonNodes = conflictGraph.get1UIPCut(currentLevel);
 
             long blevel;
             if (reasonNodes.array.length >= 2)
@@ -479,12 +497,17 @@ class CDCLSolver
         this.history = this.history[0 .. dlevel];
 
         this.clauses = oldSolver.clauses;
-        this.unassignedVariables = oldSolver.unassignedVariables;
         this.availClauses = oldSolver.availClauses;
         this.decisionVariables = oldSolver.decisionVariables;
-        this.implicationGraph = oldSolver.implicationGraph;
+        this.implicationGraph.removeLevel(dlevel);
         this.currentLevel = oldSolver.currentLevel;
-
+        Set!long unassignedVariables = redBlackTree!long(iota(1,
+                this.preamble.variables + 1).array.to!(long[]));
+        foreach (n; this.implicationGraph.nodes)
+            unassignedVariables.removeKey(n.literal.abs);
+        debug stderr.writeln(this.implicationGraph.nodes);
+        debug stderr.writeln(oldSolver.implicationGraph.nodes);
+        this.unassignedVariables = unassignedVariables;
         this.unitClauses.clear();
         availClauses.array
             .filter!(clauseID => clauses[clauseID].isUnitClause)
