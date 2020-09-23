@@ -64,6 +64,7 @@ int main(string[] args)
 	if (args.length >= 2 && args[1] == "benchmark")
 	{
 		import std.datetime.stopwatch;
+
 		StopWatch watch;
 		watch.start;
 		res = solver.solve();
@@ -78,8 +79,9 @@ int main(string[] args)
 		writeln("s UNSATISFIABLE");
 	else
 	{
+		auto assignment = result.peek!(Literal[]);
+		writefln("v %(%d %)", *assignment ~ 0);
 		writeln("s SATISFIABLE");
-		result.writeln;
 	}
 	return 0;
 }
