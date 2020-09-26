@@ -7,7 +7,7 @@ aborttime=60
 for i in `find testcase -name "*.cnf"`; do
     let cnt++
     echo $i
-    predict=`(timeout $aborttime ./sat-d < $i 2>/dev/null || echo ABORT) | head -n 1 | sed -e 's/s //'`
+    predict=`(timeout $aborttime ./sat-d < $i 2>/dev/null || echo ABORT) | tail -n 1 | sed -e 's/s //'`
     answer=`minisat -verb=0 $i | tr -d '\n' | sed -e 's/.*precision//g'`
     
     if test "$predict" == "ABORT"; then
