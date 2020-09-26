@@ -24,6 +24,11 @@ for i in `find testcase -name "*.cnf"`; do
 	    continue
     fi
 
+    if test "$predict" == "ERROR"; then
+        echo "abort the entire run because an error occured while runnng sat-d"
+        exit 2
+    fi
+
     if test "$predict" != "$answer"; then
         echo "bad: $i"
         echo "predict: $predict"
