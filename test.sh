@@ -12,7 +12,7 @@ for i in `find testcase -name "*.cnf"`; do
     if [ $status -eq 124 ]; then
         predict="ABORT"
     elif [ $status -eq 0 ]; then
-        predict=`echo $_predict | head -n 1 | sed -e 's/s //'`
+        predict=`echo "$_predict" | tail -n 1 | sed -e 's/s //'`
     else
         predict="ERROR"
     fi
