@@ -303,6 +303,7 @@ class CDCLSolver
 
     CDCLSolver[] history;
 
+    bool restart = false;
     long restartThreshold = 100;
     double restartMult = 1.5;
     ulong conflictCount;
@@ -382,7 +383,7 @@ class CDCLSolver
                     backtrack(res.blevel);
                     addConflictClause(res.conflict);
                     conflictCount++;
-                    if (conflictCount % restartThreshold == 0)
+                    if (restart && conflictCount == restartThreshold)
                     {
                         // restart
                         writefln("c restart. conflicted %d times", conflictCount);
