@@ -303,6 +303,10 @@ class CDCLSolver
 
     CDCLSolver[] history;
 
+    long restartThreshold = 100;
+    double restartMult = 1.5;
+    ulong conflictCount;
+
     this()
     {
         implicationGraph.initalize();
@@ -377,6 +381,14 @@ class CDCLSolver
                     //debug stderr.writefln("conflict clause: %s", res.conflict);
                     backtrack(res.blevel);
                     addConflictClause(res.conflict);
+                    conflictCount++;
+                    if (conflictCount % restartThreshold == 0)
+                    {
+                        // restart
+                        writefln("c restart. conflicted %d times", conflictCount);
+                        backtrack(0);
+                        restartThreshold = cast(long)(cast(double) restartThreshold * restartMult);
+                    }
                 }
                 else
                     break;
