@@ -9,6 +9,7 @@ import std.file : getcwd;
 import std.string : chomp, join;
 import tseytin;
 import std.math : abs;
+import std.getopt;
 
 int main(string[] args)
 {
@@ -20,19 +21,25 @@ int main(string[] args)
 
 	// write("testcase file: ");
 	// stdout.flush();
+	bool renderGraph, isTseytin, benchmark;
+	string filepath;
+	auto helpInfo = getopt(args, "graph|G", "output .dot files", &renderGraph,
+			"benchmark|B", "run benchmark", &benchmark,
+			"file", &filepath, "tseytin|tseitin|T", "enable tseytin transformation", &isTseytin);
+
+	if (helpInfo.helpWanted)
+	{
+		defaultGetoptPrinter("sat-d is a small SAT solver implementation written in D.",
+				helpInfo.options);
+		return 0;
+	}
 
 	CDCLSolver solver = new CDCLSolver();
 	CDCLSolverResult res;
-	// solver.initialize(solver.parseClauses(File("testcase/graph-ordering-5.cnf")));
 
-	if (args.length >= 2 && args[1] == "tseytin")
+	if (isTseytin)
 	{
-		if (args.length == 2)
-		{
-			stderr.writeln("Usage: sat-d tseytin <formula>");
-			return 1;
-		}
-		auto formula = args[2 .. $].join(' ');
+		auto formula = args[$ - 1];
 		auto tseytin = tseytinTransform(formula);
 		solver.initialize(tseytin.parseResult);
 		res = solver.solve();
@@ -58,10 +65,10 @@ int main(string[] args)
 			return 0;
 		}
 	}
-	solver.initialize(parseClauses());
-	if (args.length >= 2 && args[1] == "true")
-		solver.generateGraph = true;
-	if (args.length >= 2 && args[1] == "benchmark")
+	auto cls = filepath ? parseClauses(File(filepath)) : parseClauses();
+	solver.initialize(cls);
+	solver.generateGraph = renderGraph;
+	if (benchmark)
 	{
 		import std.datetime.stopwatch;
 
