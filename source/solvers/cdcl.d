@@ -290,7 +290,7 @@ alias CDCLSolverResult = Algebraic!(Literal[], typeof(null));
 class CDCLSolver
 {
     Clause[Clause.ID] clauses;
-    Set!(long) unassignedVariables = redBlackTree!long;
+    Set!(long) unassignedVariables;
     auto availClauses = redBlackTree!("a > b", Clause.ID);
     ImplicationGraph implicationGraph;
     size_t currentLevel;
@@ -300,8 +300,12 @@ class CDCLSolver
     Literal[] decisionVariables;
     bool generateGraph = false;
     Preamble preamble;
+    ulong variableNum;
 
-    CDCLSolver[] history;
+    Literal[] assignedLiterals;
+    Clause.ID[] reasons;
+    ulong[] assignedNumPerLevel;
+    parseResult inp;
 
     this()
     {
@@ -310,6 +314,18 @@ class CDCLSolver
 
     void initialize(parseResult res)
     {
+        this.inp = inp;
+
+        availClauses.clear();
+        unitClauses.clear();
+        implicationGraph = ImplicationGraph();
+        implicationGraph.initalize();
+        currentLevel = 0;
+        originalClauses = null;
+        decisionVariables = [];
+        assignedLiterals = [];
+        assignedNumPerLevel = [];
+
         auto clauses = res.clauses;
         foreach (clause; clauses)
         {
@@ -324,8 +340,8 @@ class CDCLSolver
             this.originalClauses[key] = Clause(value);
         }
         usedIDNum = clauses.length;
-        unassignedVariables = redBlackTree!long(iota(1,
-                res.preamble.variables + 1).array.to!(long[]));
+        unassignedVariables = redBlackTree!long(iota(1, variableNum + 1).array.to!(long[]));
+        debug stderr.writefln("*** %s", unassignedVariables);
         this.preamble = res.preamble;
     }
 
@@ -375,8 +391,8 @@ class CDCLSolver
                         return CDCLSolverResult(null);
 
                     //debug stderr.writefln("conflict clause: %s", res.conflict);
-                    backtrack(res.blevel);
                     addConflictClause(res.conflict);
+                    backtrack(res.blevel);
                 }
                 else
                     break;
@@ -387,13 +403,13 @@ class CDCLSolver
 
     void decideNextBranch()
     {
-        history ~= new CDCLSolver(this);
-
         // debug stderr.writefln("unassigned: %s", unassignedVariables);
         Literal lit = unassignedVariables.front;
         debug stderr.writefln("decision literal: %d", lit);
         currentLevel++;
+        assignedNumPerLevel ~= assignedLiterals.length;
         assignLiteral(lit);
+        reasons ~= 0;
         decisionVariables ~= lit;
         implicationGraph.decisionLiterals ~= lit;
     }
@@ -414,6 +430,7 @@ class CDCLSolver
             {
                 // debug stderr.writeln("GENERATE CONFLICT!");
                 assignLiteral(LAMBDA, lit);
+                reasons ~= 0;
                 addEdge(-lit, LAMBDA, 0);
                 addEdge(lit, LAMBDA, 0);
 
@@ -425,6 +442,7 @@ class CDCLSolver
             }
             // stderr.writefln("!unit clauses: %s", unitClauses);
             assignLiteral(lit);
+            reasons ~= clsID;
             // stderr.writefln(">unit clauses: %s", unitClauses);
             foreach (oclit; this.originalClauses[clsID].literals.array.filter!(
                     oclit => oclit != lit))
@@ -470,26 +488,33 @@ class CDCLSolver
 
     void backtrack(size_t dlevel)
     {
-        dlevel = min(history.length - 1, dlevel);
-        debug stderr.writefln("backtrack from %d to %d", currentLevel, dlevel);
-        debug stderr.writefln("history length: %d, currentLevel: %d",
-                this.history.length, currentLevel);
-        assert(this.history.length == currentLevel);
-        CDCLSolver oldSolver = this.history[dlevel];
-        this.history = this.history[0 .. dlevel];
+        Clause[ulong] originalClauses = this.originalClauses;
+        Clause[] clauses;
+        foreach (i; 1 .. this.originalClauses.length + 1)
+            clauses ~= Clause(this.originalClauses[i]);
+        parseResult* inp = &this.inp;
+        (*inp).clauses = clauses;
 
-        this.clauses = oldSolver.clauses;
-        this.unassignedVariables = oldSolver.unassignedVariables;
-        this.availClauses = oldSolver.availClauses;
-        this.decisionVariables = oldSolver.decisionVariables;
-        this.implicationGraph = oldSolver.implicationGraph;
-        this.currentLevel = oldSolver.currentLevel;
+        auto assignedLiterals = this.assignedLiterals.dup;
+        auto assignedNumPerLevel = this.assignedNumPerLevel;
 
-        this.unitClauses.clear();
-        availClauses.array
-            .filter!(clauseID => clauses[clauseID].isUnitClause)
-            .each!(clauseID => unitClauses.insert(clauseID));
-        debug stderr.writefln("availClauses: %(%s, %)", availClauses.array.map!(id => clauses[id]));
+        this.initialize(*inp);
+        this.originalClauses = originalClauses;
+
+        foreach (i; 0 .. assignedNumPerLevel[dlevel])
+        {
+            assignLiteral(assignedLiterals[i]);
+            if (reasons[i] == 0)
+            {
+                decisionVariables ~= assignedLiterals[i].abs;
+            }
+            else
+            {
+                foreach (oclit; this.originalClauses[reasons[i]].literals.array.filter!(
+                        oclit => oclit != assignedLiterals[i]))
+                    addEdge(oclit, assignedLiterals[i], reasons[i]);
+            }
+        }
     }
 
     Clause newClause(T...)(T literals)
@@ -500,30 +525,12 @@ class CDCLSolver
 
     void addConflictClause(Clause conflict)
     {
-        debug stderr.writefln("conflict clause: %s", conflict);
+        debug stderr.writefln("conflict clause[%d]: %s", conflict.id, conflict);
         assert(conflict.id !in clauses);
         // debug stderr.writefln("originalClauses: %s", originalClauses.values);
         assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
         originalClauses[conflict.id] = Clause(conflict);
         availClauses.insert(conflict.id);
-
-        foreach (dlevel; 0 .. currentLevel)
-        {
-            history[dlevel].clauses[conflict.id] = Clause(conflict);
-            foreach (node; history[dlevel].implicationGraph.nodes)
-                history[dlevel].clauses[conflict.id].removeLiteral(-node.literal);
-            if (history[dlevel].clauses[conflict.id].isUnitClause)
-                history[dlevel].unitClauses.insert(conflict.id);
-            history[dlevel].availClauses.insert(conflict.id);
-        }
-
-        foreach (node; implicationGraph.nodes.array.filter!(node => node.literal != 0))
-            conflict.removeLiteral(-node.literal);
-
-        clauses[conflict.id] = conflict;
-        if (conflict.isUnitClause)
-            unitClauses.insert(conflict.id);
-        debug stderr.writefln("conflictClauseApplied: %s", conflict);
     }
 
     void assignLiteral(T...)(T literals)

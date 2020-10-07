@@ -66,6 +66,7 @@ int main(string[] args)
 		}
 	}
 	auto cls = filepath ? parseClauses(File(filepath)) : parseClauses();
+	solver.variableNum = cls.preamble.variables;
 	solver.initialize(cls);
 	solver.generateGraph = renderGraph;
 	if (benchmark)
