@@ -7,7 +7,7 @@ aborttime=60
 for i in `find testcase -name "*.cnf"`; do
     let cnt++
     echo $i
-    _predict=`timeout $aborttime ./sat-d --restart --file "$i" 2>/dev/null`
+    _predict=`timeout $aborttime ./sat-d --file "$i" 2>/dev/null`
     status=$?
     if [ $status -eq 124 ]; then
         predict="ABORT"
