@@ -626,7 +626,7 @@ class CDCLSolver
             foreach (to, clause; tos)
             {
                 res ~= format("\"%s@%d\" -> \"%s@%d\" [label = \"%s\"];\n", from.literal, from.dlevel,
-                        to.literal, to.dlevel, clause == 0 ? "" : (clause >= preamble.clauses
+                        to.literal, to.dlevel, clause == 0 ? "" : (clause > preamble.clauses
                             ? "L:" : "") ~ this.originalClauses[clause].toString);
             }
         }
