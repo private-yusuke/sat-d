@@ -29,6 +29,7 @@ struct ImplicationGraph
     alias Node = Tuple!(Literal, "literal", size_t, "dlevel");
 
     Set!Node nodes;
+    Set!(Clause.ID) literals;
     Set!Node[Node] successors;
     Set!Node[Node] predecessors;
     Clause.ID[Node][Node] edges;
@@ -298,6 +299,7 @@ class CDCLSolver
     auto unitClauses = redBlackTree!("a > b", Clause.ID);
     Clause[Clause.ID] originalClauses;
     Literal[] decisionVariables;
+    Set!Literal assignedLiterals = redBlackTree!Literal;
     bool generateGraph = false;
     Preamble preamble;
 
@@ -326,6 +328,7 @@ class CDCLSolver
         usedIDNum = clauses.length;
         unassignedVariables = redBlackTree!long(iota(1,
                 res.preamble.variables + 1).array.to!(long[]));
+        assignedLiterals = redBlackTree!Literal;
         this.preamble = res.preamble;
     }
 
@@ -335,6 +338,7 @@ class CDCLSolver
         foreach (key, value; solver.clauses)
             this.clauses[key] = Clause(value);
         this.unassignedVariables = solver.unassignedVariables.dup;
+        this.assignedLiterals = solver.assignedLiterals.dup;
         this.availClauses = solver.availClauses.dup;
         this.implicationGraph = ImplicationGraph(solver.implicationGraph);
         this.currentLevel = solver.currentLevel;
@@ -408,8 +412,10 @@ class CDCLSolver
             Clause.ID clsID = unitClauses.front;
             unitClauses.removeKey(clsID);
             Literal lit = clauses[clsID].unitLiteral;
-            if (iota(0, currentLevel + 1).map!(l => ImplicationGraph.Node(-lit, l))
-                    .any!(n => n in implicationGraph.nodes))
+            // TODO: use map to reduce calculation time.
+            // if (iota(0, currentLevel + 1).map!(l => ImplicationGraph.Node(-lit, l))
+            //         .any!(n => n in implicationGraph.nodes))
+            if (-lit in assignedLiterals)
             {
                 // debug stderr.writeln("GENERATE CONFLICT!");
                 assignLiteral(LAMBDA, lit);
@@ -479,6 +485,7 @@ class CDCLSolver
 
         this.clauses = oldSolver.clauses;
         this.unassignedVariables = oldSolver.unassignedVariables;
+        this.assignedLiterals = oldSolver.assignedLiterals;
         this.availClauses = oldSolver.availClauses;
         this.decisionVariables = oldSolver.decisionVariables;
         this.implicationGraph = oldSolver.implicationGraph;
@@ -540,6 +547,7 @@ class CDCLSolver
             removeClausesContaining(lit);
             removeLiteralFromClauses(-lit);
             unassignedVariables.removeKey(abs(lit));
+            assignedLiterals.insert(lit);
             // stderr.writefln("availClauses: %s", availClauses);
             // availClauses.array
             //     .filter!(clauseID => clauses[clauseID].isUnitClause)
