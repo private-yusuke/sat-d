@@ -14,7 +14,7 @@ FROM dlang2/ldc-ubuntu:1.18.0
 ARG DEBCONF_NOWARNINGS=yes
 
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends musl-tools git
+RUN apt-get install -y --no-install-recommends musl-tools git minisat
 
 COPY --from=build /ldc-build-runtime.tmp/lib /dlang/dc/lib-musl
 COPY ldc2-musl.conf /dlang/dc/etc/ldc2.conf.2
