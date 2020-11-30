@@ -75,7 +75,7 @@ struct Clause {
 
     string toString() {
         if(literals.length == 0) return "(empty)";
-        else return format("(%(%d ∨ %))", literals.array);
+        else return format("(%(%d ∨ %))", literals.array.sort!((a, b) => a.abs < b.abs));
     }
 }
 
