@@ -361,8 +361,6 @@ class CDCLSolver
             while (true)
             {
                 SolverStatus status = deduce();
-                if (status == SolverStatus.CONFLICT)
-                    toDOT(true);
                 debug stderr.writefln("Deduce done. nodes: %(%s, %)",
                         implicationGraph.nodes.array.map!(p => format("(%d, %d)", p[0], p[1])));
                 if (status == SolverStatus.SAT)
@@ -370,6 +368,7 @@ class CDCLSolver
                             .array);
                 if (status == SolverStatus.CONFLICT)
                 {
+                    toDOT(true);
                     auto res = analyzeConflict();
                     if (res.blevel == -1)
                         return CDCLSolverResult(null);
