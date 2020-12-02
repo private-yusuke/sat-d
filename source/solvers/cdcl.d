@@ -296,6 +296,7 @@ class CDCLSolver
     size_t currentLevel;
 
     auto unitClauses = redBlackTree!("a > b", Clause.ID);
+    Set!(Clause.ID)[Literal] clausesContainingLiteral;
     Clause[Clause.ID] originalClauses;
     Literal[] decisionVariables;
     bool generateGraph = false;
@@ -317,8 +318,17 @@ class CDCLSolver
             if (clause.isUnitClause)
                 unitClauses.insert(clause.id);
             availClauses.insert(clause.id);
+
+            foreach (literal; clause.literals.array) {
+                if(literal !in clausesContainingLiteral)
+                    clausesContainingLiteral[literal] = redBlackTree!(Clause.ID);
+                clausesContainingLiteral[literal].insert(clause.id);
+            }
+
             debug stderr.writefln("%d: %s", clause.id, clause);
         }
+        clausesContainingLiteral[0] = redBlackTree!(Clause.ID);
+        
         foreach (key, value; this.clauses)
         {
             this.originalClauses[key] = Clause(value);
@@ -334,6 +344,8 @@ class CDCLSolver
     {
         foreach (key, value; solver.clauses)
             this.clauses[key] = Clause(value);
+        // foreach (key, value; solver.clausesContainingLiteral)
+        //     this.clausesContainingLiteral[key] = value.dup;
         this.unassignedVariables = solver.unassignedVariables.dup;
         this.availClauses = solver.availClauses.dup;
         this.implicationGraph = ImplicationGraph(solver.implicationGraph);
@@ -401,6 +413,7 @@ class CDCLSolver
     {
         while (!unitClauses.empty)
         {
+            debug writefln("unitClauses: %s", unitClauses);
             // stderr.writefln("clauses: %(%s, %)", originalClauses.values);
             // stderr.writeln("=== deduce continues");
             // stderr.writefln("%(%s ∧ %)", clauses.values.filter!(c => c.id in availClauses).array.sort!((a, b) => a.id < b.id));
@@ -478,6 +491,7 @@ class CDCLSolver
         this.history = this.history[0 .. dlevel];
 
         this.clauses = oldSolver.clauses;
+        // this.clausesContainingLiteral = oldSolver.clausesContainingLiteral;
         this.unassignedVariables = oldSolver.unassignedVariables;
         this.availClauses = oldSolver.availClauses;
         this.decisionVariables = oldSolver.decisionVariables;
@@ -514,7 +528,11 @@ class CDCLSolver
             if (history[dlevel].clauses[conflict.id].isUnitClause)
                 history[dlevel].unitClauses.insert(conflict.id);
             history[dlevel].availClauses.insert(conflict.id);
+            // foreach (literal; conflict.literals)
+            //     history[dlevel].clausesContainingLiteral[literal].insert(conflict.id);
         }
+        foreach(literal; conflict.literals)
+            clausesContainingLiteral[literal].insert(conflict.id);
 
         foreach (node; implicationGraph.nodes.array.filter!(node => node.literal != 0))
             conflict.removeLiteral(-node.literal);
@@ -572,7 +590,8 @@ class CDCLSolver
     void removeClausesContaining(Literal lit)
     {
         // stderr.writefln("these will be removed: %(%d, %)", availClauses.array.filter!(clauseID => lit in clauses[clauseID]));
-        foreach (clauseID; availClauses.array.filter!(clauseID => lit in clauses[clauseID]))
+        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
+        // foreach (clauseID; availClauses.array.filter!(clauseID => lit in clauses[clauseID]))
         {
             availClauses.removeKey(clauseID);
             unitClauses.removeKey(clauseID);
@@ -583,7 +602,7 @@ class CDCLSolver
     {
         // stderr.writefln("this literal will be removed: %d", lit);
         // stderr.writeln(availClauses.array);
-        foreach (clauseID; availClauses)
+        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
         {
             // stderr.writeln(clauses[clauseID]);
             if (!clauses[clauseID].isUnitClause)
