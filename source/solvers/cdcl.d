@@ -602,6 +602,7 @@ class CDCLSolver
     {
         // stderr.writefln("this literal will be removed: %d", lit);
         // stderr.writeln(availClauses.array);
+        if(lit !in clausesContainingLiteral) return;
         foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
         {
             // stderr.writeln(clauses[clauseID]);
