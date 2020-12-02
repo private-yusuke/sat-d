@@ -1,7 +1,6 @@
 import std;
 
 int main(string[] args) {
-    readln; // discard "s SATISFIABLE"
     auto lits = readln.split[1..$].to!(long[]);
     auto maxl = lits.map!(v => v.abs).reduce!max;
     auto n = maxl.to!real.cbrt.to!ulong;
