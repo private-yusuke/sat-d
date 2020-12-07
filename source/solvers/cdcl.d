@@ -291,7 +291,7 @@ class CDCLSolver
 {
     Clause[Clause.ID] clauses;
     Set!(long) unassignedVariables = redBlackTree!long;
-    auto availClauses = redBlackTree!("a > b", Clause.ID);
+    // auto availClauses = redBlackTree!("a > b", Clause.ID);
     ImplicationGraph implicationGraph;
     size_t currentLevel;
 
@@ -317,7 +317,7 @@ class CDCLSolver
             this.clauses[clause.id] = clause;
             if (clause.isUnitClause)
                 unitClauses.insert(clause.id);
-            availClauses.insert(clause.id);
+            // availClauses.insert(clause.id);
 
             foreach (literal; clause.literals.array) {
                 if(literal !in clausesContainingLiteral)
@@ -347,7 +347,7 @@ class CDCLSolver
         // foreach (key, value; solver.clausesContainingLiteral)
         //     this.clausesContainingLiteral[key] = value.dup;
         this.unassignedVariables = solver.unassignedVariables.dup;
-        this.availClauses = solver.availClauses.dup;
+        // this.availClauses = solver.availClauses.dup;
         this.implicationGraph = ImplicationGraph(solver.implicationGraph);
         this.currentLevel = solver.currentLevel;
         this.decisionVariables = solver.decisionVariables.dup;
@@ -493,16 +493,16 @@ class CDCLSolver
         this.clauses = oldSolver.clauses;
         // this.clausesContainingLiteral = oldSolver.clausesContainingLiteral;
         this.unassignedVariables = oldSolver.unassignedVariables;
-        this.availClauses = oldSolver.availClauses;
+        // this.availClauses = oldSolver.availClauses;
         this.decisionVariables = oldSolver.decisionVariables;
         this.implicationGraph = oldSolver.implicationGraph;
         this.currentLevel = oldSolver.currentLevel;
 
         this.unitClauses.clear();
-        availClauses.array
-            .filter!(clauseID => clauses[clauseID].isUnitClause)
-            .each!(clauseID => unitClauses.insert(clauseID));
-        debug stderr.writefln("availClauses: %(%s, %)", availClauses.array.map!(id => clauses[id]));
+        // availClauses.array
+        //     .filter!(clauseID => clauses[clauseID].isUnitClause)
+        //     .each!(clauseID => unitClauses.insert(clauseID));
+        // debug stderr.writefln("availClauses: %(%s, %)", availClauses.array.map!(id => clauses[id]));
     }
 
     Clause newClause(T...)(T literals)
@@ -518,7 +518,7 @@ class CDCLSolver
         // debug stderr.writefln("originalClauses: %s", originalClauses.values);
         assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
         originalClauses[conflict.id] = Clause(conflict);
-        availClauses.insert(conflict.id);
+        // availClauses.insert(conflict.id);
 
         foreach (dlevel; 0 .. currentLevel)
         {
@@ -527,9 +527,7 @@ class CDCLSolver
                 history[dlevel].clauses[conflict.id].removeLiteral(-node.literal);
             if (history[dlevel].clauses[conflict.id].isUnitClause)
                 history[dlevel].unitClauses.insert(conflict.id);
-            history[dlevel].availClauses.insert(conflict.id);
-            // foreach (literal; conflict.literals)
-            //     history[dlevel].clausesContainingLiteral[literal].insert(conflict.id);
+            // history[dlevel].availClauses.insert(conflict.id);
         }
         foreach(literal; conflict.literals)
             clausesContainingLiteral[literal].insert(conflict.id);
@@ -591,10 +589,11 @@ class CDCLSolver
     {
         // stderr.writefln("these will be removed: %(%d, %)", availClauses.array.filter!(clauseID => lit in clauses[clauseID]));
         if(lit !in clausesContainingLiteral) return;
-        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
+        foreach (clauseID; clausesContainingLiteral[lit])
         // foreach (clauseID; availClauses.array.filter!(clauseID => lit in clauses[clauseID]))
         {
-            availClauses.removeKey(clauseID);
+            // availClauses.removeKey(clauseID);
+            clauses[clauseID].available = false;
             unitClauses.removeKey(clauseID);
         }
     }
@@ -604,7 +603,7 @@ class CDCLSolver
         // stderr.writefln("this literal will be removed: %d", lit);
         // stderr.writeln(availClauses.array);
         if(lit !in clausesContainingLiteral) return;
-        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
+        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => clauses[cid].available))
         {
             // stderr.writeln(clauses[clauseID]);
             if (!clauses[clauseID].isUnitClause)

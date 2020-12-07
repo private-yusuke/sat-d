@@ -35,6 +35,8 @@ struct Clause {
     ID id;
     /// 節に含まれる Literal の集合
     Set!Literal literals;
+    /// 節が充足されていないか
+    bool available = true;
 
     this(ID id, Set!Literal literals) {
         this.id = id;
