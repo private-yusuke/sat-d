@@ -21,11 +21,16 @@ int main(string[] args)
 
 	// write("testcase file: ");
 	// stdout.flush();
-	bool renderGraph, isTseytin, benchmark;
+	bool renderGraph, isTseytin, benchmark, restart;
 	string filepath;
+	long restartThreshold = -1;
+	double restartMult = 1.5;
 	auto helpInfo = getopt(args, "graph|G", "output .dot files", &renderGraph,
-			"benchmark|B", "run benchmark", &benchmark,
-			"file", &filepath, "tseytin|tseitin|T", "enable tseytin transformation", &isTseytin);
+			"benchmark|B", "run benchmark", &benchmark, "file",
+			&filepath, "tseytin|tseitin|T", "enable tseytin transformation", &isTseytin,
+			"restart|R", "enable restart", &restart, "restart-threshold",
+			"Threshold for restart", &restartThreshold, "restart-scale",
+			"multiplication ratio for restart", &restartMult);
 
 	if (helpInfo.helpWanted)
 	{
@@ -36,6 +41,12 @@ int main(string[] args)
 
 	CDCLSolver solver = new CDCLSolver();
 	CDCLSolverResult res;
+	if (restartThreshold > 0)
+		solver.restartThreshold = restartThreshold;
+	if (restartMult > 0)
+		solver.restartMult = restartMult;
+
+	solver.restart = restart;
 
 	if (isTseytin)
 	{
