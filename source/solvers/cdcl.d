@@ -300,6 +300,7 @@ class CDCLSolver
     Clause[Clause.ID] originalClauses;
     Literal[] decisionVariables;
     bool generateGraph = false;
+    bool generateAnotherGraph = false;
     Preamble preamble;
 
     CDCLSolver[] history;
@@ -324,8 +325,9 @@ class CDCLSolver
                 unitClauses.insert(clause.id);
             availClauses.insert(clause.id);
 
-            foreach (literal; clause.literals.array) {
-                if(literal !in clausesContainingLiteral)
+            foreach (literal; clause.literals.array)
+            {
+                if (literal !in clausesContainingLiteral)
                     clausesContainingLiteral[literal] = redBlackTree!(Clause.ID);
                 clausesContainingLiteral[literal].insert(clause.id);
             }
@@ -333,7 +335,7 @@ class CDCLSolver
             debug stderr.writefln("%d: %s", clause.id, clause);
         }
         clausesContainingLiteral[0] = redBlackTree!(Clause.ID);
-        
+
         foreach (key, value; this.clauses)
         {
             this.originalClauses[key] = Clause(value);
@@ -544,7 +546,7 @@ class CDCLSolver
             // foreach (literal; conflict.literals)
             //     history[dlevel].clausesContainingLiteral[literal].insert(conflict.id);
         }
-        foreach(literal; conflict.literals)
+        foreach (literal; conflict.literals)
             clausesContainingLiteral[literal].insert(conflict.id);
 
         foreach (node; implicationGraph.nodes.array.filter!(node => node.literal != 0))
@@ -603,9 +605,9 @@ class CDCLSolver
     void removeClausesContaining(Literal lit)
     {
         // stderr.writefln("these will be removed: %(%d, %)", availClauses.array.filter!(clauseID => lit in clauses[clauseID]));
-        if(lit !in clausesContainingLiteral) return;
-        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
-        // foreach (clauseID; availClauses.array.filter!(clauseID => lit in clauses[clauseID]))
+        if (lit !in clausesContainingLiteral)
+            return;
+        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses)) // foreach (clauseID; availClauses.array.filter!(clauseID => lit in clauses[clauseID]))
         {
             availClauses.removeKey(clauseID);
             unitClauses.removeKey(clauseID);
@@ -616,7 +618,8 @@ class CDCLSolver
     {
         // stderr.writefln("this literal will be removed: %d", lit);
         // stderr.writeln(availClauses.array);
-        if(lit !in clausesContainingLiteral) return;
+        if (lit !in clausesContainingLiteral)
+            return;
         foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
         {
             // stderr.writeln(clauses[clauseID]);
@@ -635,9 +638,24 @@ class CDCLSolver
     {
         if (conflict)
             debug stderr.writefln("conflict exported: %d", dotCounter);
-        if (!generateGraph)
+        if (!generateGraph && !generateAnotherGraph)
             return;
-        string res = "digraph cdcl {\n";
+
+        string dotSource;
+        if (generateGraph)
+            dotSource = generateGraph1(conflict);
+        else
+            dotSource = generateGraph2(conflict);
+
+        import std.file;
+
+        std.file.write(format("%d.dot", dotCounter), dotSource);
+        dotCounter++;
+    }
+
+    string generateGraph1(bool conflict)
+    {
+        string res = "digraph cdcl {\nnode[style=filled, fillcolor=white];\n";
         res ~= "graph [layout = dot];\n";
         if (conflict)
             res ~= "\"0@%d\" [label = \"Λ\"];\n".format(currentLevel);
@@ -665,10 +683,74 @@ class CDCLSolver
         }
 
         res ~= "}\n";
-        import std.file;
+        return res;
+    }
 
-        std.file.write(format("%d.dot", dotCounter), res);
-        dotCounter++;
+    string generateGraph2(bool conflict)
+    {
+        string label(string content, string color)
+        {
+            return "<font color=\"" ~ color ~ "\">" ~ content ~ "</font>";
+        }
+
+        string generateClauseLabel(Clause.ID cl, Literal implicated)
+        {
+            if (cl == 0)
+                return "conflict";
+
+            auto literals = this.originalClauses[cl].literals.array;
+            Literal[] l, r;
+            auto tmp = literals.split(implicated);
+            l = tmp[0], r = tmp[1];
+            string ls = l.empty ? "" : format("%(%d ∨%) ∨ ", l);
+            string rs = r.empty ? "" : format(" ∨ %(%d ∨%)", r);
+            string res = "(%s%s%s)".format(ls, label(implicated.to!string, "black"), rs);
+            if (cl > preamble.clauses)
+                return "L:" ~ res;
+            else
+                return res;
+        }
+
+        string res = "digraph cdcl {\nnode[style=filled, fillcolor=white];\n";
+        res ~= "graph [layout = dot, bgcolor=\"#eaeaea\"];\n";
+        if (conflict)
+            res ~= "\"0@%d\" [label = \"Λ\"];\n".format(currentLevel);
+        foreach (level, variable; decisionVariables)
+            res ~= format("\"%d@%d\" [shape = record, label = \"%d@%d\"];\n",
+                    variable, level + 1, variable, level + 1);
+
+        alias T = Tuple!(Clause.ID, "clauseID", Literal, "implicated");
+        T[] clausesAndImplicateds;
+
+        foreach (_, tos; implicationGraph.edges)
+            foreach (to, clause; tos)
+                clausesAndImplicateds ~= T(clause, to.literal);
+
+        foreach (p; clausesAndImplicateds)
+            if (p.clauseID != 0)
+                res ~= format("\"cls%d\" [shape = invtrapezium, fontcolor=gray60, label=<%s>];\n",
+                        p.clauseID, generateClauseLabel(p.clauseID, p.implicated));
+
+        auto clauseRendered = redBlackTree!(Clause.ID);
+
+        foreach (from, tos; implicationGraph.edges)
+        {
+            foreach (to, clause; tos)
+            {
+                if (clause == 0)
+                    res ~= format("\"%s@%d\" -> \"%s@%d\"\n", from.literal,
+                            from.dlevel, to.literal, to.dlevel);
+                else
+                {
+                    res ~= format("\"%d@%d\" -> \"cls%d\"\n", from.literal, from.dlevel, clause);
+                    if (clauseRendered.insert(clause))
+                        res ~= format("\"cls%d\" -> \"%d@%d\"\n", clause, to.literal, to.dlevel);
+                }
+            }
+        }
+
+        res ~= "}\n";
+        return res;
     }
 }
 
