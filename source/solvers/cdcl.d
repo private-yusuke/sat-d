@@ -584,6 +584,8 @@ class CDCLSolver
             debug stderr.writefln("conflict exported: %d", dotCounter);
         if (!generateGraph && !generateAnotherGraph)
             return;
+	if (implicationGraph.edges.length == 0)
+	    return;
 
         string dotSource;
         if (generateGraph)
