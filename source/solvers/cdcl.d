@@ -607,7 +607,7 @@ class CDCLSolver
         if (conflict)
             res ~= "\"0@%d\" [label = \"Λ\"];\n".format(currentLevel);
         foreach (level, variable; decisionVariables)
-            res ~= format("\"%d@%d\" [shape = record, label = \"Decision variable %d at level %d\"];\n",
+            res ~= format("\"%d@%d\" [shape = record, label = \"%d@%d\"];\n",
                     variable, level + 1, variable, level + 1);
 
         foreach (from, tos; implicationGraph.edges)
