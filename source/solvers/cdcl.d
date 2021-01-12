@@ -40,6 +40,7 @@ struct ImplicationGraph
         nodes = redBlackTree!Node;
     }
 
+    /// 与えられた implication graph を deep copy するためのコンストラクタ
     this(ImplicationGraph graph)
     {
         this.nodes = graph.nodes.dup;
@@ -53,6 +54,7 @@ struct ImplicationGraph
         this.decisionLiterals = graph.decisionLiterals.dup;
     }
 
+    /// 与えられた decision level 以上の頂点やそれに繋がっている辺を削除します。
     void removeLevel(size_t dlevel)
     {
         foreach (node; nodes)
@@ -97,21 +99,22 @@ struct ImplicationGraph
         }
     }
 
+    /// 与えられたリテラルを持つ頂点を取得します。
     Node getNode(Literal lit)
     {
-        // stderr.writeln("getNode");
-        // stderr.writeln(lit);
-        // stderr.writeln(nodes.array.filter!(n => n.literal == lit));
         auto tmp = nodes.array.filter!(n => n.literal == lit);
         assert(tmp.count == 1);
         return tmp.front;
     }
 
-    Set!Node get1UIPCut(size_t dlevel)
+    /// 1UIP cut を取得します。
+    Set!Node get1UIPCut()
     {
         Set!Node res = redBlackTree!Node;
 
         Set!Node visited = redBlackTree!Node;
+
+        const ulong dlevel = decisionLiterals.length;
 
         Node[] queue = [Node(0, dlevel)];
         bool found1UIP = false;
@@ -156,81 +159,16 @@ struct ImplicationGraph
         return res;
     }
 
-    Node find1UIP(Node start, Node end, Node[] topSorted)
-    {
-        assert(start in nodes && end in nodes);
-        import std.algorithm : canFind;
-
-        Node[] queue;
-        queue ~= predecessors[end].array.filter!(node => node.dlevel == end.dlevel).array;
-        while (queue.length != 1)
-        {
-            assert(queue.length != 0);
-            Set!Node nextQueue = redBlackTree!Node;
-            foreach (node; queue)
-            {
-                if (node in predecessors)
-                    foreach (pred; predecessors[node])
-                    {
-                        if (pred.dlevel == end.dlevel)
-                        {
-                            nextQueue.insert(pred);
-                        }
-                    }
-            }
-            queue = nextQueue.array;
-        }
-        return queue[0];
-    }
-
-    Node[] getTopologicallySorted()
-    {
-        Node[] topologicallySorted;
-        Set!Node visited = redBlackTree!Node;
-        ImplicationGraph tmpGraph = ImplicationGraph(this);
-
-        void visit(Node n)
-        {
-            if (visited.insert(n))
-            {
-                if (n in tmpGraph.successors)
-                    foreach (m; tmpGraph.successors[n])
-                        visit(m);
-                topologicallySorted ~= n;
-            }
-        }
-
-        foreach (dlevel, lit; decisionLiterals)
-            visit(Node(lit, dlevel + 1));
-        foreach (node; nodes)
-            visit(node);
-
-        // debug stderr.writeln(topologicallySorted);
-        return topologicallySorted;
-    }
-
-    Set!Node getReachablesFrom(Node node)
-    {
-        Set!Node reachableNodes = redBlackTree!Node;
-
-        Node[] queue;
-        queue ~= node;
-
-        while (!queue.empty)
-        {
-            Node n = queue.front;
-            queue.popFront();
-            if (reachableNodes.insert(n))
-            {
-                if (n in successors)
-                    foreach (succ; successors[n])
-                        queue ~= succ;
-            }
-        }
-
-        return reachableNodes;
-    }
-
+    /++
+     + implication graph を conflict graph の制約を満たすように変形します。
+     + この関数呼出後のグラフは以下の制約のすべてを満たしていることが保証されています。
+     +
+     + 1. Λ とただ一つの conflict variable を含んでいる。
+     + 2. 任意の頂点について、Λ への道が存在する。
+     + 3. Λ を除くすべての頂点 l について、それが decision literal であるか、または
+     +    (l_1 or l_2 or ... or l_k or l) が既知の節として存在して、かつ
+     +    not l_1, not l_2, ..., not l_k が predecessor としてグラフに存在する。
+     +/
     void transformToConflictGraph(size_t level)
     {
         Set!Node conflictGraphNodes = redBlackTree!Node;
@@ -286,23 +224,27 @@ struct ImplicationGraph
 
 alias CDCLSolverResult = Algebraic!(Literal[], typeof(null));
 
-/// CDCL を実装した Solver
+/// CDCL を実装したソルバー
 class CDCLSolver
 {
     Clause[Clause.ID] clauses;
     Set!(long) unassignedVariables = redBlackTree!long;
+    /// まだ充足されていない節の ID の集合
     auto availClauses = redBlackTree!("a > b", Clause.ID);
     ImplicationGraph implicationGraph;
+    /// implication graph 上の頂点の decision level の最大値
     size_t currentLevel;
 
     auto unitClauses = redBlackTree!("a > b", Clause.ID);
     Set!(Clause.ID)[Literal] clausesContainingLiteral;
+    /// CNF の単純化が適用されていない形の節
     Clause[Clause.ID] originalClauses;
     Literal[] decisionVariables;
     bool generateGraph = false;
     bool generateAnotherGraph = false;
     Preamble preamble;
 
+    /// ソルバーの状態が各 decision level に対応して保持されている配列
     CDCLSolver[] history;
 
     bool restart = false;
@@ -315,6 +257,7 @@ class CDCLSolver
         implicationGraph.initalize();
     }
 
+    /// 読み込んだ CNF の情報を元にソルバーを初期化します。
     void initialize(parseResult res)
     {
         auto clauses = res.clauses;
@@ -351,8 +294,6 @@ class CDCLSolver
     {
         foreach (key, value; solver.clauses)
             this.clauses[key] = Clause(value);
-        // foreach (key, value; solver.clausesContainingLiteral)
-        //     this.clausesContainingLiteral[key] = value.dup;
         this.unassignedVariables = solver.unassignedVariables.dup;
         this.availClauses = solver.availClauses.dup;
         this.implicationGraph = ImplicationGraph(solver.implicationGraph);
@@ -367,6 +308,7 @@ class CDCLSolver
         OK
     }
 
+    /// 問題を与えて初期化したソルバーで実行すると、その問題を解いて結果を返します。
     CDCLSolverResult solve()
     {
         debug stderr.writefln("given clauses: %s", this.clauses.values);
@@ -379,7 +321,7 @@ class CDCLSolver
         {
             while (true)
             {
-                SolverStatus status = deduce();
+                immutable SolverStatus status = deduce();
                 debug stderr.writefln("Deduce done. nodes: %(%s, %)",
                         implicationGraph.nodes.array.map!(p => format("(%d, %d)", p[0], p[1])));
                 if (status == SolverStatus.SAT)
@@ -392,13 +334,13 @@ class CDCLSolver
                     if (res.blevel == -1)
                         return CDCLSolverResult(null);
 
-                    //debug stderr.writefln("conflict clause: %s", res.conflict);
                     backtrack(res.blevel);
                     addConflictClause(res.conflict);
                     conflictCount++;
+
+                    // リスタートが有効であり、conflict の回数が閾値に達していたならば、リスタートを実施します。
                     if (restart && conflictCount == restartThreshold)
                     {
-                        // restart
                         writefln("c restart. conflicted %d times", conflictCount);
                         backtrack(0);
                         restartThreshold = cast(long)(cast(double) restartThreshold * restartMult);
@@ -411,11 +353,12 @@ class CDCLSolver
         }
     }
 
+    /// 真偽値が未割り当ての変数を1つ選んで真を割り当てます。
     void decideNextBranch()
     {
+        // 現在のソルバーの状態を保存します。
         history ~= new CDCLSolver(this);
 
-        // debug stderr.writefln("unassigned: %s", unassignedVariables);
         Literal lit = unassignedVariables.front;
         debug stderr.writefln("decision literal: %d", lit);
         currentLevel++;
@@ -424,22 +367,24 @@ class CDCLSolver
         implicationGraph.decisionLiterals ~= lit;
     }
 
+    /++
+     + 単位伝播を繰り返します。
+     + 途中で矛盾が生じたら CONFLICT を返します。
+     + 矛盾なくすべての変数に真偽値を割り当てられたら SAT を返します。
+     + それ以外の場合には OK を返します。
+     +/
     SolverStatus deduce()
     {
         while (!unitClauses.empty)
         {
-            debug writefln("unitClauses: %s", unitClauses);
-            // stderr.writefln("clauses: %(%s, %)", originalClauses.values);
-            // stderr.writeln("=== deduce continues");
-            // stderr.writefln("%(%s ∧ %)", clauses.values.filter!(c => c.id in availClauses).array.sort!((a, b) => a.id < b.id));
-            // stderr.writefln("unit clauses: %(%s, %)", unitClauses.array.map!(id => clauses[id]));
+            debug stderr.writefln("unitClauses: %s", unitClauses);
+
             Clause.ID clsID = unitClauses.front;
             unitClauses.removeKey(clsID);
             Literal lit = clauses[clsID].unitLiteral;
             if (iota(0, currentLevel + 1).map!(l => ImplicationGraph.Node(-lit, l))
                     .any!(n => n in implicationGraph.nodes))
             {
-                // debug stderr.writeln("GENERATE CONFLICT!");
                 assignLiteral(LAMBDA, lit);
                 addEdge(-lit, LAMBDA, 0);
                 addEdge(lit, LAMBDA, 0);
@@ -450,9 +395,7 @@ class CDCLSolver
                 implicationGraph.transformToConflictGraph(currentLevel);
                 return SolverStatus.CONFLICT;
             }
-            // stderr.writefln("!unit clauses: %s", unitClauses);
             assignLiteral(lit);
-            // stderr.writefln(">unit clauses: %s", unitClauses);
             foreach (oclit; this.originalClauses[clsID].literals.array.filter!(
                     oclit => oclit != lit))
                 addEdge(oclit, lit, clsID);
@@ -465,17 +408,18 @@ class CDCLSolver
     }
 
     alias analyzeConflictResult = Tuple!(long, "blevel", Clause, "conflict");
+    /++
+     + 矛盾を分析します。
+     + Returns: バックトラック先のレベルと学習節
+     +/
     analyzeConflictResult analyzeConflict()
     {
-        auto level = currentLevel;
-
         while (true)
         {
-            // if(implicationGraph.predecessors[Node(LAMBDA, currentLevel)].front.dlevel == 0)
-            if (level == 0)
+            if (currentLevel == 0)
                 return analyzeConflictResult(-1, Clause(0, []));
 
-            auto reasonNodes = implicationGraph.get1UIPCut(currentLevel);
+            auto reasonNodes = implicationGraph.get1UIPCut();
 
             long blevel;
             if (reasonNodes.array.length >= 2)
@@ -495,6 +439,10 @@ class CDCLSolver
         }
     }
 
+    /++
+     + 与えられたレベルまでバックトラックします。
+     + 具体的には、ソルバーの状態を与えられたレベルのときのソルバーの状態まで復元します。
+     +/
     void backtrack(size_t dlevel)
     {
         dlevel = min(history.length - 1, dlevel);
@@ -506,7 +454,6 @@ class CDCLSolver
         this.history = this.history[0 .. dlevel];
 
         this.clauses = oldSolver.clauses;
-        // this.clausesContainingLiteral = oldSolver.clausesContainingLiteral;
         this.unassignedVariables = oldSolver.unassignedVariables;
         this.availClauses = oldSolver.availClauses;
         this.decisionVariables = oldSolver.decisionVariables;
@@ -520,17 +467,18 @@ class CDCLSolver
         debug stderr.writefln("availClauses: %(%s, %)", availClauses.array.map!(id => clauses[id]));
     }
 
+    /// 与えられたリテラルを含んだ新しい節を作成します。
     Clause newClause(T...)(T literals)
     {
         usedIDNum++;
         return Clause(usedIDNum, redBlackTree!Literal(literals));
     }
 
+    /// 与えられた節を学習節として追加します。
     void addConflictClause(Clause conflict)
     {
         debug stderr.writefln("conflict clause: %s", conflict);
         assert(conflict.id !in clauses);
-        // debug stderr.writefln("originalClauses: %s", originalClauses.values);
         assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
         originalClauses[conflict.id] = Clause(conflict);
         availClauses.insert(conflict.id);
@@ -543,8 +491,6 @@ class CDCLSolver
             if (history[dlevel].clauses[conflict.id].isUnitClause)
                 history[dlevel].unitClauses.insert(conflict.id);
             history[dlevel].availClauses.insert(conflict.id);
-            // foreach (literal; conflict.literals)
-            //     history[dlevel].clausesContainingLiteral[literal].insert(conflict.id);
         }
         foreach (literal; conflict.literals)
             clausesContainingLiteral[literal].insert(conflict.id);
@@ -558,6 +504,7 @@ class CDCLSolver
         debug stderr.writefln("conflictClauseApplied: %s", conflict);
     }
 
+    /// 与えられたリテラルが真になるように変数への真偽値割り当てを行います。
     void assignLiteral(T...)(T literals)
     {
         debug
@@ -573,10 +520,6 @@ class CDCLSolver
             removeClausesContaining(lit);
             removeLiteralFromClauses(-lit);
             unassignedVariables.removeKey(abs(lit));
-            // stderr.writefln("availClauses: %s", availClauses);
-            // availClauses.array
-            //     .filter!(clauseID => clauses[clauseID].isUnitClause)
-            //     .each!(clauseID => unitClauses.insert(clauseID));
         }
     }
 
@@ -602,30 +545,27 @@ class CDCLSolver
 
     }
 
+    /// 与えられたリテラルを含む節を削除します。
     void removeClausesContaining(Literal lit)
     {
-        // stderr.writefln("these will be removed: %(%d, %)", availClauses.array.filter!(clauseID => lit in clauses[clauseID]));
         if (lit !in clausesContainingLiteral)
             return;
-        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses)) // foreach (clauseID; availClauses.array.filter!(clauseID => lit in clauses[clauseID]))
+        foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
         {
             availClauses.removeKey(clauseID);
             unitClauses.removeKey(clauseID);
         }
     }
 
+    /// 与えられたリテラルをそれぞれの節の中から削除します。
     void removeLiteralFromClauses(Literal lit)
     {
-        // stderr.writefln("this literal will be removed: %d", lit);
-        // stderr.writeln(availClauses.array);
         if (lit !in clausesContainingLiteral)
             return;
         foreach (clauseID; clausesContainingLiteral[lit].array.filter!(cid => cid in availClauses))
         {
-            // stderr.writeln(clauses[clauseID]);
             if (!clauses[clauseID].isUnitClause)
                 clauses[clauseID].removeLiteral(lit);
-            // stderr.writeln(clauses[clauseID]);
             if (clauses[clauseID].isUnitClause)
                 unitClauses.insert(clauseID);
             if (clauses[clauseID].isEmptyClause)
@@ -634,6 +574,10 @@ class CDCLSolver
     }
 
     private int dotCounter;
+    /++
+     + implication graph の状態を DOT 言語で出力します。
+     + ファイル名は 1.dot, 2.dot, … のように続きます。
+     +/
     void toDOT(bool conflict)
     {
         if (conflict)
@@ -647,12 +591,13 @@ class CDCLSolver
         else
             dotSource = generateGraph2(conflict);
 
-        import std.file;
+        import std.file : write;
 
-        std.file.write(format("%d.dot", dotCounter), dotSource);
+        write(format("%d.dot", dotCounter), dotSource);
         dotCounter++;
     }
 
+    /// implication graph の定義に即した形のグラフを表す DOT 言語のソースを返します。
     string generateGraph1(bool conflict)
     {
         string res = "digraph cdcl {\nnode[style=filled, fillcolor=white];\n";
@@ -662,16 +607,7 @@ class CDCLSolver
         foreach (level, variable; decisionVariables)
             res ~= format("\"%d@%d\" [shape = record, label = \"Decision variable %d at level %d\"];\n",
                     variable, level + 1, variable, level + 1);
-        // foreach (variable; implicationGraph.nodes.array.filter!(n => this.originalClauses
-        //         .array
-        //         .filter!(c => c.id > preamble.clauses)
-        //         .array
-        //         .any!(c => n.literal in c)))
-        //     res ~= format(
-        //             "\"%d@%d\" [shape = parallelogram, label = \"%d@%d from learnt clause\", fillcolor = \"#cde0b4\"];\n",
-        //             variable.literal, variable.dlevel, variable.literal, variable.dlevel);
 
-        // stderr.writeln(implicationGraph.edges);
         foreach (from, tos; implicationGraph.edges)
         {
             foreach (to, clause; tos)
@@ -686,6 +622,7 @@ class CDCLSolver
         return res;
     }
 
+    /// implication graph を元に、単位伝播で用いられた節も頂点にしたグラフの DOT 言語のソースを返します。
     string generateGraph2(bool conflict)
     {
         string label(string content, string color)
@@ -751,18 +688,5 @@ class CDCLSolver
 
         res ~= "}\n";
         return res;
-    }
-}
-
-void error(A...)(string msg, A args)
-{
-    throw new DIMACSReadException(format(msg, args));
-}
-
-class DIMACSReadException : Exception
-{
-    this(string msg)
-    {
-        super(msg);
     }
 }

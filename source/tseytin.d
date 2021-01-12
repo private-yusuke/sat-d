@@ -171,9 +171,8 @@ tseytinTransformResult tseytinTransform(string input)
     }
 
     visit(inputExpr);
-    import std.algorithm;
 
-    // if the input is like "a", meaning that there's only one variable left there and no operations found
+    // if the input is like "a", there's only one variable left and no operations included
     if (expressions.length == 0)
         return tseytinTransformResult(parseResult([Clause(1, [1])], Preamble(1, 1)), [
 input: 1

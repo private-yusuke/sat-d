@@ -84,7 +84,7 @@ int main(string[] args)
 	solver.generateAnotherGraph = renderAnotherGraph;
 	if (benchmark)
 	{
-		import std.datetime.stopwatch;
+		import std.datetime.stopwatch : StopWatch;
 
 		StopWatch watch;
 		watch.start;
@@ -95,7 +95,7 @@ int main(string[] args)
 		return 0;
 	}
 
-	auto result = solver.solve();
+	immutable auto result = solver.solve();
 	if (result.peek!(typeof(null)))
 		writeln("s UNSATISFIABLE");
 	else

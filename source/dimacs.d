@@ -54,11 +54,13 @@ Preamble parsePreamble(File f = stdin)
         return Preamble(variables, clauses);
     }
 }
+
 struct Preamble
 {
     size_t variables;
     size_t clauses;
 }
+
 alias parseResult = Tuple!(Clause[], "clauses", Preamble, "preamble");
 parseResult parseClauses(File f = stdin)
 {
@@ -117,13 +119,13 @@ import std.string : format;
 
 void error(A...)(string msg, A args)
 {
-    throw new DIMACSReadException(format(msg, args));
-}
-
-class DIMACSReadException : Exception
-{
-    this(string msg)
+    class DIMACSReadException : Exception
     {
-        super(msg);
+        this(string msg)
+        {
+            super(msg);
+        }
     }
+
+    throw new DIMACSReadException(format(msg, args));
 }
