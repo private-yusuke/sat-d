@@ -10,3 +10,8 @@
 
 + https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html
 + https://massimolauria.net/cnfgen/
+
+## 参考
+
+[Scrapbox](https://scrapbox.io/sat-d/)
+- 実装ログがまとめられています
