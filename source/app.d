@@ -1,13 +1,13 @@
 import std.stdio;
-import dimacs;
-import cnf;
-import solvers.dpll;
-import assignment;
+import satd.dimacs;
+import satd.cnf;
+import satd.solvers.dpll;
+import satd.assignment;
 import std.algorithm : each;
-import solvers.cdcl;
+import satd.solvers.cdcl;
 import std.file : getcwd;
 import std.string : chomp, join;
-import tseytin;
+import satd.tseytin;
 import std.math : abs;
 import std.getopt;
 

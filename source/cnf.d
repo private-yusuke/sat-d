@@ -1,11 +1,11 @@
-module cnf;
+module satd.cnf;
 import std.container : redBlackTree, RedBlackTree;
 import std.array : array;
 import std.algorithm : count, sort;
 import std.string : format;
 import std.range : empty, zip;
 import std.math : abs;
-import dimacs;
+import satd.dimacs;
 
 debug import std.stdio;
 

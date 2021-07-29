@@ -1,6 +1,6 @@
-module assignment;
+module satd.assignment;
 
-import cnf;
+import satd.cnf;
 import std.container : redBlackTree, RedBlackTree;
 import std.range : iota, front, array, empty;
 import std.array : array;

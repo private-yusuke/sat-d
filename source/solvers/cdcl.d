@@ -1,6 +1,6 @@
-module solvers.cdcl;
-import cnf : CNF, Clause, Literal, Set;
-import dimacs : Preamble, parseResult;
+module satd.solvers.cdcl;
+import satd.cnf : CNF, Clause, Literal, Set;
+import satd.dimacs : Preamble, parseResult;
 import std.container : RedBlackTree, redBlackTree;
 import std.typecons : Tuple;
 import std.algorithm : each, any, sort, filter, map, countUntil, min, count, all;
@@ -584,8 +584,8 @@ class CDCLSolver
             debug stderr.writefln("conflict exported: %d", dotCounter);
         if (!generateGraph && !generateAnotherGraph)
             return;
-	if (implicationGraph.edges.length == 0)
-	    return;
+        if (implicationGraph.edges.length == 0)
+            return;
 
         string dotSource;
         if (generateGraph)

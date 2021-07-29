@@ -1,8 +1,8 @@
-module tseytin;
+module satd.tseytin;
 import pegged.grammar;
 import pegged.tohtml;
-import dimacs;
-import cnf;
+import satd.dimacs;
+import satd.cnf;
 import std.stdio;
 import std.string : strip;
 import std.container : redBlackTree;
@@ -30,7 +30,7 @@ Expression:
 
 debug
 {
-    import solvers.cdcl;
+    import satd.solvers.cdcl;
 
     enum bool[string] answers = [
             "not (a or not (b and c))" : true,

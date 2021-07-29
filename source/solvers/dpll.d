@@ -1,6 +1,6 @@
-module solvers.dpll;
+module satd.solvers.dpll;
 
-import cnf, assignment;
+import satd.cnf, satd.assignment;
 import std.variant : Algebraic;
 import std.typecons : Tuple;
 

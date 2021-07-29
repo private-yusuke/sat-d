@@ -1,6 +1,6 @@
-module dimacs;
-import cnf;
-import solvers.dpll : SolverResult, Null;
+module satd.dimacs;
+import satd.cnf;
+import satd.solvers.dpll : SolverResult, Null;
 import std.stdio : readln, stdin, writeln;
 import std.array : array, join;
 import std.string : split;
