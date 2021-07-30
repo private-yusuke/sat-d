@@ -468,6 +468,15 @@ class CDCLSolver
         debug stderr.writefln("availClauses: %(%s, %)", availClauses.array.map!(id => clauses[id]));
     }
 
+    /++
+     + ソルバーの状態を、真偽値割り当てがなされていない初期状態にリセットします。
+     + 初期化時以外で追加された制約はそのまま追加された状態を維持します。
+     +/
+    void reset()
+    {
+        backtrack(0);
+    }
+
     /// 与えられたリテラルを含んだ新しい節を作成します。
     Clause newClause(T...)(T literals)
     {
