@@ -49,6 +49,16 @@ struct Clause
         this(id, redBlackTree!Literal(literals));
     }
 
+    this(Set!Literal literals)
+    {
+        this.literals = literals;
+    }
+
+    this(Literal[] literals)
+    {
+        this(redBlackTree!Literal(literals));
+    }
+
     this(Clause clause)
     {
         this.id = clause.id;

@@ -17,12 +17,6 @@ import std.stdio;
 /// LAMBDA は conflict node の意。
 const Literal LAMBDA = 0;
 
-private Clause.ID usedIDNum;
-Clause.ID nextClauseID()
-{
-    return ++usedIDNum;
-}
-
 struct ImplicationGraph
 {
     /// dlevel とは、decision level のことをさす。
@@ -252,6 +246,13 @@ class CDCLSolver
     double restartMult = 1.5;
     ulong conflictCount;
 
+    private Clause.ID usedIDNum;
+
+    Clause.ID nextClauseID()
+    {
+        return ++usedIDNum;
+    }
+
     this()
     {
         implicationGraph.initalize();
@@ -470,37 +471,51 @@ class CDCLSolver
     /// 与えられたリテラルを含んだ新しい節を作成します。
     Clause newClause(T...)(T literals)
     {
+        return Clause(redBlackTree!Literal(literals));
+    }
+
+    /// 与えられたリテラルの集合に対応する新しい節を作成します。
+    Clause newClause(T)(Set!T literals) if (isIntegral!T)
+    {
+        return Clause(literals);
+    }
+
+    /// 与えられた節をソルバーの制約として追加します。
+    void addClause(Clause clause)
+    {
         usedIDNum++;
-        return Clause(usedIDNum, redBlackTree!Literal(literals));
+        clause.id = usedIDNum;
+
+        assert(clause.id !in clauses);
+        originalClauses[clause.id] = Clause(clause);
+        availClauses.insert(clause.id);
+
+        foreach (dlevel; 0 .. currentLevel)
+        {
+            history[dlevel].clauses[clause.id] = Clause(clause);
+            foreach (node; history[dlevel].implicationGraph.nodes)
+                history[dlevel].clauses[clause.id].removeLiteral(-node.literal);
+            if (history[dlevel].clauses[clause.id].isUnitClause)
+                history[dlevel].unitClauses.insert(clause.id);
+            history[dlevel].availClauses.insert(clause.id);
+        }
+        foreach (literal; clause.literals)
+            clausesContainingLiteral[literal].insert(clause.id);
+
+        foreach (node; implicationGraph.nodes.array.filter!(node => node.literal != 0))
+            clause.removeLiteral(-node.literal);
+
+        clauses[clause.id] = clause;
+        if (clause.isUnitClause)
+            unitClauses.insert(clause.id);
     }
 
     /// 与えられた節を学習節として追加します。
     void addConflictClause(Clause conflict)
     {
         debug stderr.writefln("conflict clause: %s", conflict);
-        assert(conflict.id !in clauses);
         assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
-        originalClauses[conflict.id] = Clause(conflict);
-        availClauses.insert(conflict.id);
-
-        foreach (dlevel; 0 .. currentLevel)
-        {
-            history[dlevel].clauses[conflict.id] = Clause(conflict);
-            foreach (node; history[dlevel].implicationGraph.nodes)
-                history[dlevel].clauses[conflict.id].removeLiteral(-node.literal);
-            if (history[dlevel].clauses[conflict.id].isUnitClause)
-                history[dlevel].unitClauses.insert(conflict.id);
-            history[dlevel].availClauses.insert(conflict.id);
-        }
-        foreach (literal; conflict.literals)
-            clausesContainingLiteral[literal].insert(conflict.id);
-
-        foreach (node; implicationGraph.nodes.array.filter!(node => node.literal != 0))
-            conflict.removeLiteral(-node.literal);
-
-        clauses[conflict.id] = conflict;
-        if (conflict.isUnitClause)
-            unitClauses.insert(conflict.id);
+        addClause(conflict);
         debug stderr.writefln("conflictClauseApplied: %s", conflict);
     }
 
