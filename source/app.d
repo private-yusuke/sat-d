@@ -7,8 +7,6 @@ import std.algorithm : each;
 import satd.solvers.cdcl;
 import std.file : getcwd;
 import std.string : chomp, join;
-import satd.tseytin;
-import std.math : abs;
 import std.getopt;
 
 int main(string[] args)
@@ -52,6 +50,8 @@ int main(string[] args)
 
 	if (isTseytin)
 	{
+		import satd.tseytin;
+
 		auto formula = args[$ - 1];
 		auto tseytin = tseytinTransform(formula);
 		solver.initialize(tseytin.parseResult);
@@ -64,16 +64,7 @@ int main(string[] args)
 		}
 		else
 		{
-			bool[string] assignment;
-			bool[Literal] litToTruth;
-			foreach (lit; *literals)
-			{
-				litToTruth[abs(lit)] = lit > 0;
-			}
-			foreach (var, lit; tseytin.varToLiteral)
-			{
-				assignment[var] = litToTruth[lit];
-			}
+			bool[string] assignment = resultToOriginalVarsAssignment(tseytin, *literals);
 			assignment.writeln;
 			return 0;
 		}

@@ -252,6 +252,27 @@ input: 1
             clauseVarNum - 1)), varToLiteral);
 }
 
+bool[string] resultToOriginalVarsAssignment(tseytinTransformResult transformResult,
+        Literal[] solverResultLiterals)
+{
+    import std.math : abs;
+
+    if (solverResultLiterals is null)
+        return null;
+
+    bool[string] assignment;
+    bool[Literal] litToTruth;
+    foreach (lit; solverResultLiterals)
+    {
+        litToTruth[abs(lit)] = lit > 0;
+    }
+    foreach (var, lit; transformResult.varToLiteral)
+    {
+        assignment[var] = litToTruth[lit];
+    }
+    return assignment;
+}
+
 private:
 import std.string : format;
 
