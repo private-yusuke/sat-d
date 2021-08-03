@@ -12,7 +12,7 @@ do
 	name="bad$bad-$git_latest-$mode-$(echo "$args" | sed -e 's/\s/-/g').cnf"
 	cnfgen $mode $args > $name
 	cl=$(clasp $name | grep -G "^s")
-	sd=$(./sat-d < $name | grep -G "^s")
+	sd=$(./sat-d-demo < $name | grep -G "^s")
 	if [ "$cl" != "$sd" ]
 	then
 		bad=$((bad+1))
