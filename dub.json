@@ -6,6 +6,7 @@
 	"dependencies": {
 		"pegged": "~>0.4.4"
 	},
+	"targetType": "library",
 	"description": "A small SAT solver implementation",
 	"license": "MIT",
 	"name": "sat-d"

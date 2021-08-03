@@ -1,3 +1,5 @@
+module app;
+
 import std.stdio;
 import satd.dimacs;
 import satd.cnf;
