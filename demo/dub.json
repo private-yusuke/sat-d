@@ -1,0 +1,9 @@
+{
+	"name": "sat-d-demo",
+    "description": "A command line tool for interacting with sat-d",
+    "targetType": "executable",
+    "sourceFiles": ["demo.d"],
+    "dependencies": {
+        "sat-d": {"path": "../"}
+    }
+}

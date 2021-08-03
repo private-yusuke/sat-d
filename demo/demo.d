@@ -1,4 +1,4 @@
-module app;
+module demo.demo;
 
 import std.stdio;
 import satd.dimacs;
