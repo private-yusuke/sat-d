@@ -147,7 +147,7 @@ struct ImplicationGraph
                 res.insert(decisionNode);
             }
             queue = nextQueue;
-            debug stderr.writefln("nextQueue: %s", nextQueue);
+            // debug stderr.writefln("nextQueue: %s", nextQueue);
         }
 
         return res;
@@ -276,7 +276,7 @@ class CDCLSolver
                 clausesContainingLiteral[literal].insert(clause.id);
             }
 
-            debug stderr.writefln("%d: %s", clause.id, clause);
+            // debug stderr.writefln("%d: %s", clause.id, clause);
         }
         clausesContainingLiteral[0] = redBlackTree!(Clause.ID);
 
@@ -312,7 +312,7 @@ class CDCLSolver
     /// 問題を与えて初期化したソルバーで実行すると、その問題を解いて結果を返します。
     CDCLSolverResult solve()
     {
-        debug stderr.writefln("given clauses: %s", this.clauses.values);
+        // debug stderr.writefln("given clauses: %s", this.clauses.values);
 
         if (this.clauses.values.any!(c => c.literals.length == 0))
             return CDCLSolverResult(null);
@@ -323,8 +323,8 @@ class CDCLSolver
             while (true)
             {
                 immutable SolverStatus status = deduce();
-                debug stderr.writefln("Deduce done. nodes: %(%s, %)",
-                        implicationGraph.nodes.array.map!(p => format("(%d, %d)", p[0], p[1])));
+                // debug stderr.writefln("Deduce done. nodes: %(%s, %)",
+                // implicationGraph.nodes.array.map!(p => format("(%d, %d)", p[0], p[1])));
                 if (status == SolverStatus.SAT)
                     return CDCLSolverResult(implicationGraph.nodes.array.map!(node => node.literal)
                             .array);
@@ -361,7 +361,7 @@ class CDCLSolver
         history ~= new CDCLSolver(this);
 
         Literal lit = unassignedVariables.front;
-        debug stderr.writefln("decision literal: %d", lit);
+        // debug stderr.writefln("decision literal: %d", lit);
         currentLevel++;
         assignLiteral(lit);
         decisionVariables ~= lit;
@@ -378,7 +378,7 @@ class CDCLSolver
     {
         while (!unitClauses.empty)
         {
-            debug stderr.writefln("unitClauses: %s", unitClauses);
+            // debug stderr.writefln("unitClauses: %s", unitClauses);
 
             Clause.ID clsID = unitClauses.front;
             unitClauses.removeKey(clsID);
@@ -431,8 +431,8 @@ class CDCLSolver
             else
                 blevel = 0;
 
-            debug stderr.writefln("reasonNodes: %(%s %)",
-                    reasonNodes.array.map!(c => format("(%s, %s)", c[0], c[1])));
+            // debug stderr.writefln("reasonNodes: %(%s %)",
+            // reasonNodes.array.map!(c => format("(%s, %s)", c[0], c[1])));
 
             auto learningLiterals = reasonNodes.array.map!(node => -node.literal).array;
             Clause conflict = newClause(learningLiterals);
@@ -447,9 +447,9 @@ class CDCLSolver
     void backtrack(size_t dlevel)
     {
         dlevel = min(history.length - 1, dlevel);
-        debug stderr.writefln("backtrack from %d to %d", currentLevel, dlevel);
-        debug stderr.writefln("history length: %d, currentLevel: %d",
-                this.history.length, currentLevel);
+        // debug stderr.writefln("backtrack from %d to %d", currentLevel, dlevel);
+        // debug stderr.writefln("history length: %d, currentLevel: %d",
+        // this.history.length, currentLevel);
         assert(this.history.length == currentLevel);
         CDCLSolver oldSolver = this.history[dlevel];
         this.history = this.history[0 .. dlevel];
@@ -465,7 +465,7 @@ class CDCLSolver
         availClauses.array
             .filter!(clauseID => clauses[clauseID].isUnitClause)
             .each!(clauseID => unitClauses.insert(clauseID));
-        debug stderr.writefln("availClauses: %(%s, %)", availClauses.array.map!(id => clauses[id]));
+        // debug stderr.writefln("availClauses: %(%s, %)", availClauses.array.map!(id => clauses[id]));
     }
 
     /++
@@ -522,10 +522,10 @@ class CDCLSolver
     /// 与えられた節を学習節として追加します。
     void addConflictClause(Clause conflict)
     {
-        debug stderr.writefln("conflict clause: %s", conflict);
+        // debug stderr.writefln("conflict clause: %s", conflict);
         assert(!originalClauses.values.any!(c => c.literals == conflict.literals));
         addClause(conflict);
-        debug stderr.writefln("conflictClauseApplied: %s", conflict);
+        // debug stderr.writefln("conflictClauseApplied: %s", conflict);
     }
 
     /// 与えられたリテラルが真になるように変数への真偽値割り当てを行います。
@@ -533,8 +533,8 @@ class CDCLSolver
     {
         debug
         {
-            stderr.writefln("assignLiteral: %s", literals);
-            stderr.writeln(unassignedVariables);
+            // debug stderr.writefln("assignLiteral: %s", literals);
+            // debug stderr.writeln(unassignedVariables);
             if (literals[0] != 0)
                 assert(literals[0].abs in unassignedVariables);
         }
@@ -549,7 +549,7 @@ class CDCLSolver
 
     void addNode(Literal lit, size_t dlevel)
     {
-        debug stderr.writefln("new node: %s, at level %s", lit, dlevel);
+        // debug stderr.writefln("new node: %s, at level %s", lit, dlevel);
         implicationGraph.nodes.insert(ImplicationGraph.Node(lit, dlevel));
     }
 
@@ -557,7 +557,7 @@ class CDCLSolver
     {
         alias Node = ImplicationGraph.Node;
 
-        debug stderr.writefln("Add edge from %s to %s", -from, to);
+        // debug stderr.writefln("Add edge from %s to %s", -from, to);
         Node fromNode = implicationGraph.getNode(-from), toNode = implicationGraph.getNode(to);
         if (fromNode !in implicationGraph.successors)
             implicationGraph.successors[fromNode] = redBlackTree!Node;
@@ -604,8 +604,8 @@ class CDCLSolver
      +/
     void toDOT(bool conflict)
     {
-        if (conflict)
-            debug stderr.writefln("conflict exported: %d", dotCounter);
+        // if (conflict)
+        // debug stderr.writefln("conflict exported: %d", dotCounter);
         if (!generateGraph && !generateAnotherGraph)
             return;
         if (implicationGraph.edges.length == 0)
