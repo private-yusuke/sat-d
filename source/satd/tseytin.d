@@ -67,6 +67,12 @@ debug
         assert(isSAT("not (a or not (b and c))"));
         assert(isSAT("not (a -> (b and c)) -> (b or not d equiv a)"));
     }
+
+    unittest
+    {
+        assert("(a)" !in tseytinTransform("(a)").varToLiteral);
+        assert("a" in tseytinTransform("(a)").varToLiteral);
+    }
 }
 
 enum ExprType
@@ -174,9 +180,10 @@ tseytinTransformResult tseytinTransform(string input)
 
     // if the input is like "a", there's only one variable left and no operations included
     if (expressions.length == 0)
-        return tseytinTransformResult(parseResult([Clause(1, [1])], Preamble(1, 1)), [
-input: 1
-                ]);
+    {
+        return tseytinTransformResult(parseResult([Clause(1, [1])], Preamble(1,
+                1)), [originalVars.front: 1]);
+    }
 
     auto vars = redBlackTree!string;
     foreach (ind, expr; expressions)
