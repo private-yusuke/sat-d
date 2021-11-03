@@ -261,8 +261,9 @@ class CDCLSolver
     /// 読み込んだ CNF の情報を元にソルバーを初期化します。
     void initialize(parseResult res)
     {
-        auto clauses = res.clauses;
-        foreach (clause; clauses)
+        availClauses = redBlackTree!("a > b", Clause.ID);
+        unitClauses = redBlackTree!("a > b", Clause.ID);
+        foreach (clause; res.clauses)
         {
             this.clauses[clause.id] = clause;
             if (clause.isUnitClause)
@@ -298,7 +299,7 @@ class CDCLSolver
         this.unassignedVariables = solver.unassignedVariables.dup;
         this.availClauses = solver.availClauses.dup;
         this.implicationGraph = ImplicationGraph(solver.implicationGraph);
-        this.currentLevel = solver.currentLevel;
+        this.availClauses = solver.availClauses.dup;
         this.decisionVariables = solver.decisionVariables.dup;
     }
 
