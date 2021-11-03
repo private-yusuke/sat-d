@@ -222,14 +222,14 @@ alias CDCLSolverResult = Algebraic!(Literal[], typeof(null));
 class CDCLSolver
 {
     Clause[Clause.ID] clauses;
-    Set!(long) unassignedVariables = redBlackTree!long;
+    Set!(long) unassignedVariables;
     /// まだ充足されていない節の ID の集合
-    auto availClauses = redBlackTree!("a > b", Clause.ID);
+    RedBlackTree!(Clause.ID, "a > b") availClauses;
     ImplicationGraph implicationGraph;
     /// implication graph 上の頂点の decision level の最大値
     size_t currentLevel;
 
-    auto unitClauses = redBlackTree!("a > b", Clause.ID);
+    RedBlackTree!(Clause.ID, "a > b") unitClauses;
     Set!(Clause.ID)[Literal] clausesContainingLiteral;
     /// CNF の単純化が適用されていない形の節
     Clause[Clause.ID] originalClauses;
@@ -301,6 +301,7 @@ class CDCLSolver
         this.implicationGraph = ImplicationGraph(solver.implicationGraph);
         this.availClauses = solver.availClauses.dup;
         this.decisionVariables = solver.decisionVariables.dup;
+        this.currentLevel = solver.currentLevel;
     }
 
     enum SolverStatus
@@ -453,7 +454,7 @@ class CDCLSolver
         // this.history.length, currentLevel);
         assert(this.history.length == currentLevel);
         CDCLSolver oldSolver = this.history[dlevel];
-        this.history = this.history[0 .. dlevel];
+        this.history.length = dlevel;
 
         this.clauses = oldSolver.clauses;
         this.unassignedVariables = oldSolver.unassignedVariables;
